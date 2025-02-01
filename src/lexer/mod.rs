@@ -13,7 +13,7 @@ pub enum Token {
     String(String),
     Char(char),
     True, False, Nullptr,
-    Fn, Struct,
+    Fn, Struct, Arrow,
     Any, U16, I16, F16, Bool,
     As, Alias,
     Plus, Minus, Asterisk, Slash, Ampersand, Bang,
@@ -38,7 +38,7 @@ impl<'a> Lexer<'a> {
         while self.chars.next_if(|(_, c)| c.is_whitespace()).is_some() {}
     }
 
-    fn parse_ident(&mut self) -> Option<(usize, Token)> {
+    fn parse_ident(&mut self) -> Option<Result<(usize, Token), CompilerError>> {
         let mut result = String::new();
         let idx = self.chars.peek()?.0;
         while self.chars.peek().is_some_and(|(_, c)| c.is_alphanumeric() || *c == '_') {
@@ -66,10 +66,10 @@ impl<'a> Lexer<'a> {
             "iter" => Token::Iter,
             _ => Token::Ident(result),
         };
-        Some((idx, token))
+        Some(Ok((idx, token)))
     }
 
-    fn parse_number(&mut self) -> Option<(usize, Token)> {
+    fn parse_number(&mut self) -> Option<Result<(usize, Token), CompilerError>> {
         let idx = self.chars.peek()?.0;
 
         let mut result = String::new();
@@ -78,7 +78,7 @@ impl<'a> Lexer<'a> {
             result.push(c);
         }
 
-        Some((idx, match self.chars.peek() {
+        Some(Ok((idx, match self.chars.peek() {
             Some((_, '.')) => {
                 let _ = self.chars.next();
                 while let Some((_, c)) = self.chars.next_if(|(_, c)| c.is_ascii_digit()) {
@@ -87,7 +87,7 @@ impl<'a> Lexer<'a> {
                 Token::Float(result)
             }
             _ => Token::Integer(result)
-        }))
+        })))
     }
 
     /*
@@ -103,14 +103,15 @@ impl<'a> Lexer<'a> {
         //
      */
 
-    fn parse_operator(&mut self) -> Result<Option<(usize, Token)>, CompilerError> {
-        let Some((idx, next)) = self.chars.next() else {
-            return Ok(None);
-        };
+    fn parse_operator(&mut self) -> Option<Result<(usize, Token), CompilerError>> {
+        let (idx, next) = self.chars.next()?;
 
         let token = match next {
             '+' => Token::Plus,
-            '-' => Token::Minus,
+            '-' => match self.chars.next_if(|(_, c)| *c == '>') {
+                Some(_) => Token::Arrow,
+                None => Token::Minus,
+            },
             '*' => Token::Asterisk,
             '/' => if self.chars.next_if(|(_, c)| *c == '/').is_some() {
                 while self.chars.next_if(|(_, c)| *c != '\n').is_some() {}
@@ -148,21 +149,25 @@ impl<'a> Lexer<'a> {
                 Some(_) => Token::GreaterThanEquals,
                 None => Token::GreaterThan,
             },
-            c => return Err(CompilerError::SyntaxError(SyntaxError {
+            c => return Some(Err(CompilerError::SyntaxError(SyntaxError {
                 char_idx: idx,
                 found: c,
-            })),
+            }))),
         };
-        Ok(Some((idx, token)))
+        Some(Ok((idx, token)))
     }
+}
 
-    pub fn next(&mut self) -> Result<Option<(usize, Token)>, CompilerError> {
+impl Iterator for Lexer<'_> {
+    type Item = Result<(usize, Token), CompilerError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();
         match self.chars.peek() {
-            Some((_, c)) if c.is_ascii_digit() => Ok(self.parse_number()),
-            Some((_, c)) if c.is_alphabetic() || *c == '_' => Ok(self.parse_ident()),
+            Some((_, c)) if c.is_ascii_digit() => self.parse_number(),
+            Some((_, c)) if c.is_alphabetic() || *c == '_' => self.parse_ident(),
             Some(_) => self.parse_operator(),
-            None => Ok(None),
+            None => None,
         }
     }
 }

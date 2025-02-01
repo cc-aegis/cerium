@@ -1,5 +1,8 @@
+extern crate core;
+
 pub mod lexer;
 pub mod error;
+mod parser;
 
 fn main() {
     let code = "
@@ -11,7 +14,7 @@ fn main() {
 
     ";
     let mut lexer = lexer::Lexer::new(code);
-    while let Ok(Some(token)) = lexer.next() {
+    while let Some(token) = lexer.next() {
         println!("{:?}", token);
     }
 }
