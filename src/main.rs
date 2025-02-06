@@ -12,6 +12,11 @@ fn main() {
     io::print(x);
 }
 
+fn sqrt(base: f16) -> f16 {
+    let approx = (base alias u16 + 15360) alias f16 >> 1;
+    (base / approx + approx) * 0.5
+}
+
     ";
     let mut lexer = lexer::Lexer::new(code);
     while let Some(token) = lexer.next() {

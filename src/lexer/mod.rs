@@ -80,7 +80,7 @@ impl<'a> Lexer<'a> {
 
         Some(Ok((idx, match self.chars.peek() {
             Some((_, '.')) => {
-                let _ = self.chars.next();
+                result.push(self.chars.next().unwrap().1);
                 while let Some((_, c)) = self.chars.next_if(|(_, c)| c.is_ascii_digit()) {
                     result.push(c);
                 }
