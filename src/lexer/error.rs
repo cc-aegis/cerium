@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct SyntaxError {
     pub char_idx: usize,
     pub found: char,

@@ -1,0 +1,21 @@
+fn malloc(size: u16) -> &any {
+    static HEAP: &u16 = &0;
+    *HEAP = *HEAP - size;
+    *HEAP alias &any
+}
+
+fn free(pointer: &any) {
+    // haha you thought
+}
+
+// malloc(u16)->any*:
+//     read r0 .HEAP
+//     sub r0 [#-3]
+//     write r0 .HEAP
+//     ret
+//
+// .HEAP:
+//     dw 65536
+//
+// free(any*):
+//     ret

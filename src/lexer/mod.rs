@@ -1,6 +1,7 @@
 pub mod error;
 
 use std::iter::{Enumerate, Peekable};
+use std::ops::Range;
 use std::str::Chars;
 use crate::error::CompilerError;
 use crate::lexer::error::SyntaxError;
@@ -16,14 +17,15 @@ pub enum Token {
     Fn, Struct, Arrow,
     Any, U16, I16, F16, Bool,
     As, Alias,
-    Plus, Minus, Asterisk, Slash, Ampersand, Bang,
+    Plus, Minus, Asterisk, Slash, Ampersand, Pipe, Circumflex, Bang,
     LParen, RParen, LBracket, RBracket, LBrace, RBrace,
     Colon, Semicolon, Scope, Comma, Dot,
-    For, To, While, Loop, Break, Continue,
+    For, To, While, Loop, Break, Continue, Let, If, Else,
     Iter,
     Assign, Equals, NotEquals, LessThan, LessThanEquals, GreaterThan, GreaterThanEquals,
+    And, Or,
+    LShift, RShift,
 }
-
 
 pub struct Lexer<'a> {
     chars: Peekable<Enumerate<Chars<'a>>>,
@@ -38,12 +40,13 @@ impl<'a> Lexer<'a> {
         while self.chars.next_if(|(_, c)| c.is_whitespace()).is_some() {}
     }
 
-    fn parse_ident(&mut self) -> Option<Result<(usize, Token), CompilerError>> {
+    fn parse_ident(&mut self) -> Option<Result<(Range<usize>, Token), CompilerError>> {
         let mut result = String::new();
         let idx = self.chars.peek()?.0;
         while self.chars.peek().is_some_and(|(_, c)| c.is_alphanumeric() || *c == '_') {
             result.push(self.chars.next().unwrap().1);
         }
+        let len = result.len();
         let token = match result.as_str() {
             "true" => Token::True,
             "false" => Token::False,
@@ -64,12 +67,15 @@ impl<'a> Lexer<'a> {
             "break" => Token::Break,
             "continue" => Token::Continue,
             "iter" => Token::Iter,
+            "let" => Token::Let,
+            "if" => Token::If,
+            "else" => Token::Else,
             _ => Token::Ident(result),
         };
-        Some(Ok((idx, token)))
+        Some(Ok((idx..idx + len, token)))
     }
 
-    fn parse_number(&mut self) -> Option<Result<(usize, Token), CompilerError>> {
+    fn parse_number(&mut self) -> Option<Result<(Range<usize>, Token), CompilerError>> {
         let idx = self.chars.peek()?.0;
 
         let mut result = String::new();
@@ -78,7 +84,7 @@ impl<'a> Lexer<'a> {
             result.push(c);
         }
 
-        Some(Ok((idx, match self.chars.peek() {
+        Some(Ok((idx..idx + result.len(), match self.chars.peek() {
             Some((_, '.')) => {
                 result.push(self.chars.next().unwrap().1);
                 while let Some((_, c)) = self.chars.next_if(|(_, c)| c.is_ascii_digit()) {
@@ -103,63 +109,73 @@ impl<'a> Lexer<'a> {
         //
      */
 
-    fn parse_operator(&mut self) -> Option<Result<(usize, Token), CompilerError>> {
+    fn parse_operator(&mut self) -> Option<Result<(Range<usize>, Token), CompilerError>> {
         let (idx, next) = self.chars.next()?;
 
-        let token = match next {
-            '+' => Token::Plus,
+        let (len, token) = match next {
+            '+' => (1, Token::Plus),
             '-' => match self.chars.next_if(|(_, c)| *c == '>') {
-                Some(_) => Token::Arrow,
-                None => Token::Minus,
+                Some(_) => (2, Token::Arrow),
+                None => (1, Token::Minus),
             },
-            '*' => Token::Asterisk,
+            '*' => (1, Token::Asterisk),
             '/' => if self.chars.next_if(|(_, c)| *c == '/').is_some() {
                 while self.chars.next_if(|(_, c)| *c != '\n').is_some() {}
                 return self.next();
             } else {
-                Token::Slash
+                (1, Token::Slash)
             },
-            '&' => Token::Ampersand,
             '!' => match self.chars.next_if(|(_, c)| *c == '=') {
-                Some(_) => Token::NotEquals,
-                None => Token::Bang,
+                Some(_) => (2, Token::NotEquals),
+                None => (1, Token::Bang),
             },
-            '(' => Token::LParen,
-            ')' => Token::RParen,
-            '[' => Token::LBracket,
-            ']' => Token::RBracket,
-            '{' => Token::LBrace,
-            '}' => Token::RBrace,
+            '(' => (1, Token::LParen),
+            ')' => (1, Token::RParen),
+            '[' => (1, Token::LBracket),
+            ']' => (1, Token::RBracket),
+            '{' => (1, Token::LBrace),
+            '}' => (1, Token::RBrace),
             ':' => match self.chars.next_if(|(_, c)| *c == ':') {
-                Some(_) => Token::Scope,
-                None => Token::Colon,
+                Some(_) => (2, Token::Scope),
+                None => (1, Token::Colon),
             },
-            ';' => Token::Semicolon,
-            ',' => Token::Comma,
-            '.' => Token::Dot,
+            ';' => (1, Token::Semicolon),
+            ',' => (1, Token::Comma),
+            '.' => (1, Token::Dot),
             '=' => match self.chars.next_if(|(_, c)| *c == '=') {
-                Some(_) => Token::Equals,
-                None => Token::Assign,
+                Some(_) => (2, Token::Equals),
+                None => (1, Token::Assign),
             },
-            '<' => match self.chars.next_if(|(_, c)| *c == '=') {
-                Some(_) => Token::LessThanEquals,
-                None => Token::LessThan,
+            '<' => match self.chars.next_if(|(_, c)| *c == '=' || *c == '<') {
+                Some((_, '=')) => (2, Token::LessThanEquals),
+                Some(_) => (2, Token::LShift),
+                None => (1, Token::LessThan),
             },
-            '>' => match self.chars.next_if(|(_, c)| *c == '=') {
-                Some(_) => Token::GreaterThanEquals,
-                None => Token::GreaterThan,
+            '>' => match self.chars.next_if(|(_, c)| *c == '=' || *c == '>') {
+                Some((_, '=')) => (2, Token::GreaterThanEquals),
+                Some(_) => (2, Token::RShift),
+                None => (1, Token::GreaterThan),
             },
+            '|' => match self.chars.next_if(|(_, c)| *c == '|') {
+                Some(_) => (2, Token::Or),
+                None => (1, Token::Pipe),
+            },
+            '&' => match self.chars.next_if(|(_, c)| *c == '&') {
+                Some(_) => (2, Token::And),
+                None => (1, Token::Ampersand),
+            },
+            '^' => (1, Token::Circumflex),
             c => return Some(Err(CompilerError::SyntaxError(SyntaxError {
                 char_idx: idx,
                 found: c,
             }))),
         };
-        Some(Ok((idx, token)))
+        Some(Ok((idx..idx + len, token)))
     }
 }
 
 impl Iterator for Lexer<'_> {
-    type Item = Result<(usize, Token), CompilerError>;
+    type Item = Result<(Range<usize>, Token), CompilerError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();

@@ -1,0 +1,10 @@
+fn main() {
+    for x = 0 to 128 {
+        for y = 0 to 96 {
+            let color = ((y << 7) | x);
+            set_pixel(x, y, color);
+        }
+    }
+    flip_display();
+    loop {}
+}

@@ -1,0 +1,10 @@
+// function
+fn main() {
+    let x: u16* = &[1, 2, 3, 4];
+    io::print(x);
+}
+
+fn sqrt(base: f16) -> f16 {
+    let approx = (base alias u16 + 15360) alias f16 >> 1;
+    (base / approx + approx) * 0.5
+}
