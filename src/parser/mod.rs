@@ -113,7 +113,7 @@ impl Parser<'_> {
         let mut parameters = Vec::new();
         while !matches!(self.lexer.peek(), Some(Ok((_, Token::RParen)))) {
             let param_name = expect_token!(self.lexer, (_, Token::Ident(ident)), ident);
-            expect_token!(self.lexer, (_, Token::LParen), {});
+            expect_token!(self.lexer, (_, Token::Colon), {});
             let param_type = self.parse_type()?;
             parameters.push((param_name, param_type));
             if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {

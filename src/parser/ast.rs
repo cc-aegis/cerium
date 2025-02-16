@@ -1,14 +1,17 @@
 use std::ops::Range;
 use crate::parser::cerium_type::CeriumType;
 
+#[derive(Debug)]
 pub struct Program {
     pub(crate) definitions: Vec<Definition>
 }
 
+#[derive(Debug)]
 pub enum Definition {
     Function(Function),
 }
 
+#[derive(Debug)]
 pub struct Function {
     pub name: Qualifier,
     pub parameters: Vec<(String, CeriumType)>,
@@ -16,6 +19,7 @@ pub struct Function {
     pub body: Box<Expression>,
 }
 
+#[derive(Debug)]
 pub struct Qualifier {
     pub names: Vec<String>,
 }
@@ -23,6 +27,7 @@ pub struct Qualifier {
 
 
 
+#[derive(Debug)]
 pub enum Expression {
     Scope(Range<usize>, Scope),
     Integer(Range<usize>, String),
@@ -49,21 +54,25 @@ impl Expression {
     }
 }
 
+#[derive(Debug)]
 pub struct FieldAccess {
     pub base: Box<Expression>,
     pub field: String,
 }
 
+#[derive(Debug)]
 pub struct ArrayAccess {
     pub base: Box<Expression>,
     pub index: Box<Expression>,
 }
 
+#[derive(Debug)]
 pub struct Scope {
     pub instructions: Vec<Expression>,
     pub value: Option<Box<Expression>>,
 }
 
+#[derive(Debug)]
 struct TypeCast {
     pub value: Box<Expression>,
     pub target_type: Box<CeriumType>,

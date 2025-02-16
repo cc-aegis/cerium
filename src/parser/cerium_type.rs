@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub enum CeriumType {
     I16,
     U16,
