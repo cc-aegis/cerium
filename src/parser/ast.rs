@@ -37,6 +37,27 @@ pub enum Expression {
     Variable(Range<usize>, String),
     FieldAccess(Range<usize>, FieldAccess),
     ArrayAccess(Range<usize>, ArrayAccess),
+    Assignment(Range<usize>, Assignment),
+    LogicalAnd(Range<usize>, LogicalAnd),
+    LogicalOr(Range<usize>, LogicalOr),
+    LessThan(Range<usize>, LessThan),
+    LessThanEquals(Range<usize>, LessThanEquals),
+    GreaterThan(Range<usize>, GreaterThan),
+    GreaterThanEquals(Range<usize>, GreaterThanEquals),
+    Equals(Range<usize>, Equals),
+    NotEquals(Range<usize>, NotEquals),
+    BitwiseOr(Range<usize>, BitwiseOr),
+    BitwiseXor(Range<usize>, BitwiseXor),
+    BitwiseAnd(Range<usize>, BitwiseAnd),
+    LeftShift(Range<usize>, LeftShift),
+    RightShift(Range<usize>, RightShift),
+    Addition(Range<usize>, Addition),
+    Subtraction(Range<usize>, Subtraction),
+    Multiplication(Range<usize>, Multiplication),
+    Division(Range<usize>, Division),
+    Borrow(Range<usize>, Borrow),
+    Negation(Range<usize>, Negation),
+    Deref(Range<usize>, Deref),
 }
 
 impl Expression {
@@ -50,6 +71,27 @@ impl Expression {
             Expression::Variable(range, _) => range,
             Expression::FieldAccess(range, _) => range,
             Expression::ArrayAccess(range, _) => range,
+            Expression::Assignment(range, _) => range,
+            Expression::LogicalAnd(range, _) => range,
+            Expression::LogicalOr(range, _) => range,
+            Expression::LessThan(range, _) => range,
+            Expression::LessThanEquals(range, _) => range,
+            Expression::GreaterThan(range, _) => range,
+            Expression::GreaterThanEquals(range, _) => range,
+            Expression::Equals(range, _) => range,
+            Expression::NotEquals(range, _) => range,
+            Expression::BitwiseOr(range, _) => range,
+            Expression::BitwiseXor(range, _) => range,
+            Expression::BitwiseAnd(range, _) => range,
+            Expression::LeftShift(range, _) => range,
+            Expression::RightShift(range, _) => range,
+            Expression::Addition(range, _) => range,
+            Expression::Subtraction(range, _) => range,
+            Expression::Multiplication(range, _) => range,
+            Expression::Division(range, _) => range,
+            Expression::Borrow(range, _) => range,
+            Expression::Negation(range, _) => range,
+            Expression::Deref(range, _) => range,
         }.clone()
     }
 }
@@ -73,7 +115,130 @@ pub struct Scope {
 }
 
 #[derive(Debug)]
-struct TypeCast {
+pub struct TypeCast {
     pub value: Box<Expression>,
     pub target_type: Box<CeriumType>,
+}
+
+#[derive(Debug)]
+pub struct Assignment {
+    pub target: Box<Expression>,
+    pub value: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct LogicalAnd {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct LogicalOr {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct LessThan {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct LessThanEquals {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct GreaterThan {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct GreaterThanEquals {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Equals {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct NotEquals {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct BitwiseOr {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct BitwiseXor {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct BitwiseAnd {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct LeftShift {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct RightShift {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Addition {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Subtraction {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Multiplication {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Division {
+    pub lhs: Box<Expression>,
+    pub rhs: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Borrow {
+    pub inner: Box<Expression>
+}
+
+#[derive(Debug)]
+pub struct Negation {
+    pub inner: Box<Expression>
+}
+
+#[derive(Debug)]
+pub struct Deref {
+    pub inner: Box<Expression>
 }

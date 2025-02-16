@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::ops::Range;
 use crate::error::CompilerError;
 use crate::lexer::{Lexer, Token};
-use crate::parser::ast::{ArrayAccess, Definition, Expression, FieldAccess, Function, Program, Qualifier, Scope};
+use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, Function, GreaterThan, GreaterThanEquals, LeftShift, LessThan, LessThanEquals, LogicalAnd, LogicalOr, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Subtraction};
 use crate::parser::cerium_type::CeriumType;
 
 mod ast;
@@ -169,13 +169,180 @@ value   [LParen Expression RParen] | [Value LBracket Expression RBracket] | [Val
 
 *thing.field[3] = 4
  */
+
+//TODO: design macros for repeatedly used logic
 impl Parser<'_> {
     fn parse_expression(&mut self) -> Result<Expression, CompilerError> {
-        todo!()
+        // = ||&& <><=>=!=== &|^<<>> +- */ aliasas !&*
+        let lhs = self.parse_logical_operation()?;
+
+        if self.lexer.next_if(|t| matches!(t, Ok((_, Token::And)))).is_some() {
+            let rhs = self.parse_expression()?;
+            let range = lhs.range().start..rhs.range().end;
+            Ok(Expression::Assignment(range, Assignment { target: Box::new(lhs), value: Box::new(rhs) }))
+        } else {
+            Ok(lhs)
+        }
+    }
+    fn parse_logical_operation(&mut self) -> Result<Expression, CompilerError> {
+        let mut result = self.parse_compare_operation()?;
+        loop {
+            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::And)))).is_some() {
+                let rhs = self.parse_compare_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::LogicalAnd(range, LogicalAnd { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Or)))).is_some() {
+                let rhs = self.parse_compare_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::LogicalOr(range, LogicalOr { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else {
+                break Ok(result);
+            }
+        }
     }
 
+    fn parse_compare_operation(&mut self) -> Result<Expression, CompilerError> {
+        let mut result = self.parse_bitwise_operation()?;
+        loop {
+            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LessThan)))).is_some() {
+                let rhs = self.parse_bitwise_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::LessThan(range, LessThan { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LessThanEquals)))).is_some() {
+                let rhs = self.parse_bitwise_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::LessThanEquals(range, LessThanEquals { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::GreaterThan)))).is_some() {
+                let rhs = self.parse_bitwise_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::GreaterThan(range, GreaterThan { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::GreaterThanEquals)))).is_some() {
+                let rhs = self.parse_bitwise_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::GreaterThanEquals(range, GreaterThanEquals { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Equals)))).is_some() {
+                let rhs = self.parse_bitwise_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::Equals(range, Equals { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::NotEquals)))).is_some() {
+                let rhs = self.parse_bitwise_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::NotEquals(range, NotEquals { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else {
+                break Ok(result);
+            }
+        }
+    }
+
+    fn parse_bitwise_operation(&mut self) -> Result<Expression, CompilerError> {
+        let mut result = self.parse_dash_operation()?;
+        loop {
+            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Ampersand)))).is_some() {
+                let rhs = self.parse_dash_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::BitwiseOr(range, BitwiseOr { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Circumflex)))).is_some() {
+                let rhs = self.parse_dash_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::BitwiseXor(range, BitwiseXor { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Pipe)))).is_some() {
+                let rhs = self.parse_dash_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::BitwiseAnd(range, BitwiseAnd { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LShift)))).is_some() {
+                let rhs = self.parse_dash_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::LeftShift(range, LeftShift { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::RShift)))).is_some() {
+                let rhs = self.parse_dash_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::RightShift(range, RightShift { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else {
+                break Ok(result);
+            }
+        }
+    }
+
+    fn parse_dash_operation(&mut self) -> Result<Expression, CompilerError> {
+        let mut result = self.parse_point_operation()?;
+        loop {
+            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Plus)))).is_some() {
+                let rhs = self.parse_point_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::Addition(range, Addition { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Minus)))).is_some() {
+                let rhs = self.parse_point_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::Subtraction(range, Subtraction { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else {
+                break Ok(result);
+            }
+        }
+    }
+
+    fn parse_point_operation(&mut self) -> Result<Expression, CompilerError> {
+        let mut result = self.parse_typing_operation()?;
+        loop {
+            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Asterisk)))).is_some() {
+                let rhs = self.parse_typing_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::Multiplication(range, Multiplication { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Slash)))).is_some() {
+                let rhs = self.parse_typing_operation()?;
+                let range = result.range().start .. rhs.range().end;
+                result = Expression::Division(range, Division { lhs: Box::new(result), rhs: Box::new(rhs) });
+            } else {
+                break Ok(result);
+            }
+        }
+    }
+
+    fn parse_typing_operation(&mut self) -> Result<Expression, CompilerError> {
+        let mut result = self.parse_prefix_operation()?;
+        loop {
+            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Alias)))).is_some() {
+                let target_type = self.parse_type()?;
+                //let range = result.range().start .. rhs.range().end;
+                todo!()
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::As)))).is_some() {
+                let target_type = self.parse_type()?;
+                //let range = result.range().start .. rhs.range().end;
+                todo!()
+            } else {
+                break Ok(result);
+            }
+        }
+    }
+
+    fn parse_prefix_operation(&mut self) -> Result<Expression, CompilerError> {
+        match self.lexer.peek().ok_or(CompilerError::MissingTokenError)? {
+            Ok((_, Token::Ampersand)) => {
+                let range = self.lexer.next().unwrap().unwrap().0;
+                let inner = Box::new(self.parse_prefix_operation()?);
+                Ok(Expression::Borrow(range.start..inner.range().end, Borrow { inner }))
+            },
+            Ok((_, Token::Bang)) => {
+                let range = self.lexer.next().unwrap().unwrap().0;
+                let inner = Box::new(self.parse_prefix_operation()?);
+                Ok(Expression::Negation(range.start..inner.range().end, Negation { inner }))
+            },
+            Ok((_, Token::Asterisk)) => {
+                let range = self.lexer.next().unwrap().unwrap().0;
+                let inner = Box::new(self.parse_prefix_operation()?);
+                Ok(Expression::Deref(range.start..inner.range().end, Deref { inner }))
+            },
+            Ok(_) => self.parse_value(),
+            Err(err) => Err(err.clone()),
+        }
+    }
+}
+
+impl Parser<'_> {
     fn parse_parens(&mut self) -> Result<Expression, CompilerError> {
-        todo!()
+        expect_token!(self.lexer, (_, Token::LParen), {});
+        let result = self.parse_expression();
+        expect_token!(self.lexer, (_, Token::RParen), {});
+        result
     }
 
     fn parse_let(&mut self) -> Result<Expression, CompilerError> {
