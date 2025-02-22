@@ -30,11 +30,13 @@ pub struct Qualifier {
 #[derive(Debug)]
 pub enum Expression {
     Scope(Range<usize>, Scope),
+    TypeCast(Range<usize>, TypeCast),
+    TypeAlias(Range<usize>, TypeAlias),
     Integer(Range<usize>, String),
     Float(Range<usize>, String),
     Boolean(Range<usize>, bool),
     Nullptr(Range<usize>),
-    Variable(Range<usize>, String),
+    Variable(Range<usize>, Qualifier),
     FieldAccess(Range<usize>, FieldAccess),
     ArrayAccess(Range<usize>, ArrayAccess),
     Assignment(Range<usize>, Assignment),
@@ -58,12 +60,15 @@ pub enum Expression {
     Borrow(Range<usize>, Borrow),
     Negation(Range<usize>, Negation),
     Deref(Range<usize>, Deref),
+    Let(Range<usize>, Let),
 }
 
 impl Expression {
     pub fn range(&self) -> Range<usize> {
         match self {
             Expression::Scope(range, _) => range,
+            Expression::TypeCast(range, _) => range,
+            Expression::TypeAlias(range, _) => range,
             Expression::Integer(range, _) => range,
             Expression::Float(range, _) => range,
             Expression::Boolean(range, _) => range,
@@ -92,6 +97,7 @@ impl Expression {
             Expression::Borrow(range, _) => range,
             Expression::Negation(range, _) => range,
             Expression::Deref(range, _) => range,
+            Expression::Let(range, _) => range,
         }.clone()
     }
 }
@@ -116,6 +122,12 @@ pub struct Scope {
 
 #[derive(Debug)]
 pub struct TypeCast {
+    pub value: Box<Expression>,
+    pub target_type: Box<CeriumType>,
+}
+
+#[derive(Debug)]
+pub struct TypeAlias {
     pub value: Box<Expression>,
     pub target_type: Box<CeriumType>,
 }
@@ -241,4 +253,10 @@ pub struct Negation {
 #[derive(Debug)]
 pub struct Deref {
     pub inner: Box<Expression>
+}
+
+#[derive(Debug)]
+pub struct Let {
+    pub name: Qualifier,
+    pub value: Box<Expression>
 }

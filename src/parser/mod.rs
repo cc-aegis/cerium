@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::ops::Range;
 use crate::error::CompilerError;
 use crate::lexer::{Lexer, Token};
-use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, Function, GreaterThan, GreaterThanEquals, LeftShift, LessThan, LessThanEquals, LogicalAnd, LogicalOr, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Subtraction};
+use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, Function, GreaterThan, GreaterThanEquals, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Subtraction, TypeAlias};
 use crate::parser::cerium_type::CeriumType;
 
 mod ast;
@@ -37,10 +37,14 @@ macro_rules! expect_token {
     ($lexer:expr, $pattern:pat, $result:expr) => {
         match $lexer.next() {
             Some(Ok($pattern)) => $result,
-            Some(Ok((range, token))) => return Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError {
-                range,
-                found: token,
-            })),
+            Some(Ok((range, token))) => {
+                #[cfg(debug_assertions)]
+                panic!();
+                return Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError {
+                    range,
+                    found: token,
+                }))
+            },
             Some(Err(e)) => return Err(e),
             None => return Err(CompilerError::MissingTokenError),
         }
@@ -62,41 +66,52 @@ impl<'a> Parser<'a> {
 }
 
 impl Parser<'_> {
-    fn parse_qualifier(&mut self) -> Result<Qualifier, CompilerError> {
-        let mut result = vec![expect_token!(self.lexer, (_, Token::Ident(ident)), ident)];
+    fn parse_qualifier(&mut self) -> Result<(Range<usize>, Qualifier), CompilerError> {
+        let (start, mut end, mut result) = expect_token!(self.lexer, (Range { start, end }, Token::Ident(ident)), (start, end, vec![ident]));
         while self.lexer.next_if(|t| matches!(t, Ok((_, Token::Scope)))).is_some() {
-            result.push(expect_token!(self.lexer, (_, Token::Ident(ident)), ident));
+            result.push(expect_token!(self.lexer, (range, Token::Ident(ident)), {
+                end = range.end;
+                ident
+            }));
         }
-        Ok(Qualifier { names: result })
+        Ok((start..end, Qualifier { names: result }))
     }
 
-    fn parse_type(&mut self) -> Result<CeriumType, CompilerError> {
+    fn parse_type(&mut self) -> Result<(Range<usize>, CeriumType), CompilerError> {
         //fn(..type)->type fn(..type) &type [type] [type; N] i16 u16 f16 bool any S S<..type>
         match self.lexer.next().ok_or(CompilerError::MissingTokenError)?? {
-            (_, Token::I16) => Ok(CeriumType::I16),
-            (_, Token::U16) => Ok(CeriumType::U16),
-            (_, Token::F16) => Ok(CeriumType::F16),
-            (_, Token::Bool) => Ok(CeriumType::Bool),
-            (_, Token::Any) => Ok(CeriumType::Any),
-            (_, Token::Ident(ident)) => Ok(CeriumType::Struct(ident, Vec::new())),
-            (_, Token::Ampersand) => Ok(CeriumType::Pointer(Box::new(self.parse_type()?))),
-            (_, Token::Fn) => {
+            (range, Token::I16) => Ok((range, CeriumType::I16)),
+            (range, Token::U16) => Ok((range, CeriumType::U16)),
+            (range, Token::F16) => Ok((range, CeriumType::F16)),
+            (range, Token::Bool) => Ok((range, CeriumType::Bool)),
+            (range, Token::Any) => Ok((range, CeriumType::Any)),
+            (range, Token::Ident(ident)) => Ok((range, CeriumType::Struct(ident, Vec::new()))),
+            (Range { start, .. }, Token::Ampersand) => {
+                let (Range { end, .. }, inner_type) = self.parse_type()?;
+                Ok((start .. end, CeriumType::Pointer(Box::new(inner_type))))
+            },
+            (Range { start, .. }, Token::And) => {
+                let (Range { end, .. }, inner_type) = self.parse_type()?;
+                Ok((start .. end, CeriumType::Pointer(Box::new(CeriumType::Pointer(Box::new(inner_type))))))
+            },
+            (Range { start, .. }, Token::Fn) => {
                 expect_token!(self.lexer, (_, Token::LParen), {});
                 let mut param_types = Vec::new();
                 while !matches!(self.lexer.peek(), Some(Ok((_, Token::RParen)))) {
-                    let param_type = self.parse_type()?;
+                    let param_type = self.parse_type()?.1;
                     param_types.push(param_type);
                     if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {
                         break;
                     }
                 }
-                expect_token!(self.lexer, (_, Token::RParen), {});
-                let return_type = if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Arrow)))).is_some() {
-                    Some(Box::new(self.parse_type()?))
+                let mut end = expect_token!(self.lexer, (Range { end, .. }, Token::RParen), end);
+                let return_type = if let Some(Ok((range, _))) = self.lexer.next_if(|t| matches!(t, Ok((_, Token::Arrow)))) {
+                    end = range.end;
+                    Some(Box::new(self.parse_type()?.1))
                 } else {
                     None
                 };
-                Ok(CeriumType::Function(param_types, return_type))
+                Ok((start .. end, CeriumType::Function(param_types, return_type)))
 
             },
             (range, found) => Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError {
@@ -108,13 +123,13 @@ impl Parser<'_> {
 
     fn parse_function(&mut self) -> Result<Definition, CompilerError> {
         expect_token!(self.lexer, (_, Token::Fn), {});
-        let name = self.parse_qualifier()?;
+        let name = self.parse_qualifier()?.1;
         expect_token!(self.lexer, (_, Token::LParen), {});
         let mut parameters = Vec::new();
         while !matches!(self.lexer.peek(), Some(Ok((_, Token::RParen)))) {
             let param_name = expect_token!(self.lexer, (_, Token::Ident(ident)), ident);
             expect_token!(self.lexer, (_, Token::Colon), {});
-            let param_type = self.parse_type()?;
+            let param_type = self.parse_type()?.1;
             parameters.push((param_name, param_type));
             if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {
                 break;
@@ -122,7 +137,7 @@ impl Parser<'_> {
         }
         expect_token!(self.lexer, (_, Token::RParen), {});
         let return_type = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Arrow)))) {
-            Some(_) => Some(self.parse_type()?),
+            Some(_) => Some(self.parse_type()?.1),
             None => None,
         };
         let body = Box::new(self.parse_scope()?);
@@ -176,7 +191,7 @@ impl Parser<'_> {
         // = ||&& <><=>=!=== &|^<<>> +- */ aliasas !&*
         let lhs = self.parse_logical_operation()?;
 
-        if self.lexer.next_if(|t| matches!(t, Ok((_, Token::And)))).is_some() {
+        if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Assign)))).is_some() {
             let rhs = self.parse_expression()?;
             let range = lhs.range().start..rhs.range().end;
             Ok(Expression::Assignment(range, Assignment { target: Box::new(lhs), value: Box::new(rhs) }))
@@ -301,9 +316,12 @@ impl Parser<'_> {
         let mut result = self.parse_prefix_operation()?;
         loop {
             if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Alias)))).is_some() {
-                let target_type = self.parse_type()?;
+                let (range, target_type) = self.parse_type()?;
                 //let range = result.range().start .. rhs.range().end;
-                todo!()
+                result = Expression::TypeAlias(range, TypeAlias {
+                    value: Box::new(result),
+                    target_type: Box::new(target_type),
+                })
             } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::As)))).is_some() {
                 let target_type = self.parse_type()?;
                 //let range = result.range().start .. rhs.range().end;
@@ -346,7 +364,14 @@ impl Parser<'_> {
     }
 
     fn parse_let(&mut self) -> Result<Expression, CompilerError> {
-        todo!()
+        let start = expect_token!(self.lexer, (Range { start, .. }, Token::Let), start);
+        let name = expect_token!(self.lexer, (_, Token::Ident(i)), i);
+        expect_token!(self.lexer, (_, Token::Assign), {});
+        let value = self.parse_expression()?;
+        Ok(Expression::Let(start .. value.range().end, Let {
+            name: Qualifier { names: vec![name] },
+            value: Box::new(value),
+        }))
     }
 
     fn parse_if(&mut self) -> Result<Expression, CompilerError> {
@@ -414,8 +439,10 @@ impl Parser<'_> {
     }
 
     fn parse_variable(&mut self) -> Result<Expression, CompilerError> {
-        let (range, name) = expect_token!(self.lexer, (range, Token::Ident(ident)), (range, ident));
-        Ok(Expression::Variable(range, name))
+        // let (range, name) = expect_token!(self.lexer, (range, Token::Ident(ident)), (range, ident));
+        // Ok(Expression::Variable(range, name))
+        let (range, qualifier) = self.parse_qualifier()?;
+        Ok(Expression::Variable(range, qualifier))
     }
 
     fn parse_scope(&mut self) -> Result<Expression, CompilerError> {

@@ -1,0 +1,9 @@
+fn mem::HEAP() {}
+
+fn mem::init() {
+    *(mem::HEAP alias &&any) = nullptr;
+}
+
+fn mem::alloc(size: u16) -> &any {
+    *(mem::HEAP alias &&any) = *(mem::HEAP alias &&any) - size
+}
