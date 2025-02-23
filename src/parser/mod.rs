@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::ops::Range;
 use crate::error::CompilerError;
 use crate::lexer::{Lexer, Token};
-use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, Function, GreaterThan, GreaterThanEquals, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Subtraction, TypeAlias};
+use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Subtraction, TypeAlias, While};
 use crate::parser::cerium_type::CeriumType;
 
 mod ast;
@@ -375,19 +375,63 @@ impl Parser<'_> {
     }
 
     fn parse_if(&mut self) -> Result<Expression, CompilerError> {
-        todo!()
+        let start = expect_token!(self.lexer, (Range { start, .. }, Token::If), start);
+        let condition = self.parse_expression()?;
+        let if_branch = self.parse_scope()?;
+        let (end, else_branch) = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Else)))) {
+            Some(_) => {
+                let else_branch = self.parse_scope()?;
+                (else_branch.range().end, Some(Box::new(else_branch)))
+            },
+            None => (if_branch.range().end, None),
+        };
+        Ok(Expression::If(start .. end, If {
+            condition: Box::new((condition)),
+            if_branch: Box::new((if_branch)),
+            else_branch,
+        }))
     }
 
     fn parse_for(&mut self) -> Result<Expression, CompilerError> {
-        todo!()
-    }
-
-    fn parse_loop(&mut self) -> Result<Expression, CompilerError> {
-        todo!()
+        //for <qualifier> (= <expr>) (to <expr>) (step <const>)
+        let start = expect_token!(self.lexer, (Range { start, .. }, Token::For), start);
+        let counter = self.parse_qualifier()?.1;
+        let initialization = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Assign)))) {
+            Some(_) => Some(Box::new(self.parse_expression()?)),
+            None => None,
+        };
+        let limit = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::To)))) {
+            Some(_) => Some(Box::new(self.parse_expression()?)),
+            None => None,
+        };
+        // let initialization = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Step)))) {
+        //    Some(_) => Some(self.parse_expression()?),
+        //    None => None,
+        // };
+        let body = self.parse_expression()?;
+        Ok(Expression::For(start..body.range().end, For {
+            counter,
+            initialization,
+            limit,
+            step: None,
+            body: Box::new(body),
+        }))
     }
 
     fn parse_while(&mut self) -> Result<Expression, CompilerError> {
-        todo!()
+        let start = expect_token!(self.lexer, (Range { start, .. }, Token::While), start);
+        let condition = self.parse_expression()?;
+        let body = self.parse_scope()?;
+        Ok(Expression::While(start .. body.range().end, While {
+            condition: Box::new(condition),
+            body: Box::new(body),
+        }))
+    }
+
+    fn parse_loop(&mut self) -> Result<Expression, CompilerError> {
+        let start = expect_token!(self.lexer, (Range { start, .. }, Token::Loop), start);
+        let body = self.parse_scope()?;
+        Ok(Expression::Loop(start .. body.range().end, Loop { body: Box::new(body) }))
     }
 
     fn parse_value(&mut self) -> Result<Expression, CompilerError> {
@@ -414,9 +458,28 @@ impl Parser<'_> {
                 });
             } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LBracket)))).is_some() {
                 let index = self.parse_expression()?;
-                result = Expression::ArrayAccess(result.range().start .. index.range().end, ArrayAccess {
+                let end = expect_token!(self.lexer, (Range { end, .. }, Token::RBracket), end);
+                result = Expression::ArrayAccess(result.range().start..end, ArrayAccess {
                     base: Box::new(result),
                     index: Box::new(index),
+                });
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LParen)))).is_some() {
+                let mut params = Vec::new();
+                loop {
+                    if matches!(self.lexer.peek(), Some(Ok((_, Token::RParen)))) {
+                        break;
+                    }
+
+                    params.push(self.parse_expression()?);
+
+                    if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {
+                        break;
+                    }
+                }
+                let end = expect_token!(self.lexer, (Range { end, .. }, Token::RParen), end);
+                result = Expression::FunctionCall(result.range().start..end, FunctionCall {
+                    func: Box::new(result),
+                    params,
                 });
             } else {
                 break Ok(result);

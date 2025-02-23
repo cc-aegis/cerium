@@ -9,7 +9,7 @@ pub mod error;
 mod parser;
 
 fn main() {
-    let code = include_str!("../cerium/mem_beta.cer");
+    let code = include_str!("../cerium/test.cer");
     //println!("{code}");
     let lexer = lexer::Lexer::new(code);
     let mut parser = parser::Parser::new(lexer);

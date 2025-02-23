@@ -39,6 +39,7 @@ pub enum Expression {
     Variable(Range<usize>, Qualifier),
     FieldAccess(Range<usize>, FieldAccess),
     ArrayAccess(Range<usize>, ArrayAccess),
+    FunctionCall(Range<usize>, FunctionCall),
     Assignment(Range<usize>, Assignment),
     LogicalAnd(Range<usize>, LogicalAnd),
     LogicalOr(Range<usize>, LogicalOr),
@@ -61,6 +62,10 @@ pub enum Expression {
     Negation(Range<usize>, Negation),
     Deref(Range<usize>, Deref),
     Let(Range<usize>, Let),
+    If(Range<usize>, If),
+    For(Range<usize>, For),
+    While(Range<usize>, While),
+    Loop(Range<usize>, Loop),
 }
 
 impl Expression {
@@ -76,6 +81,7 @@ impl Expression {
             Expression::Variable(range, _) => range,
             Expression::FieldAccess(range, _) => range,
             Expression::ArrayAccess(range, _) => range,
+            Expression::FunctionCall(range, _) => range,
             Expression::Assignment(range, _) => range,
             Expression::LogicalAnd(range, _) => range,
             Expression::LogicalOr(range, _) => range,
@@ -98,6 +104,10 @@ impl Expression {
             Expression::Negation(range, _) => range,
             Expression::Deref(range, _) => range,
             Expression::Let(range, _) => range,
+            Expression::If(range, _) => range,
+            Expression::For(range, _) => range,
+            Expression::While(range, _) => range,
+            Expression::Loop(range, _) => range,
         }.clone()
     }
 }
@@ -112,6 +122,12 @@ pub struct FieldAccess {
 pub struct ArrayAccess {
     pub base: Box<Expression>,
     pub index: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct FunctionCall {
+    pub func: Box<Expression>,
+    pub params: Vec<Expression>,
 }
 
 #[derive(Debug)]
@@ -259,4 +275,31 @@ pub struct Deref {
 pub struct Let {
     pub name: Qualifier,
     pub value: Box<Expression>
+}
+
+#[derive(Debug)]
+pub struct If {
+    pub condition: Box<Expression>,
+    pub if_branch: Box<Expression>,
+    pub else_branch: Option<Box<Expression>>,
+}
+
+#[derive(Debug)]
+pub struct For {
+    pub counter: Qualifier,
+    pub initialization: Option<Box<Expression>>,
+    pub limit: Option<Box<Expression>>,
+    pub step: Option<Box<Expression>>,
+    pub body: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct While {
+    pub condition: Box<Expression>,
+    pub body: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Loop {
+    pub body: Box<Expression>,
 }
