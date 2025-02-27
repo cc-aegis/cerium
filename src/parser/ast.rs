@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Display};
 use std::ops::Range;
 use crate::parser::cerium_type::CeriumType;
 
@@ -9,6 +10,7 @@ pub struct Program {
 #[derive(Debug)]
 pub enum Definition {
     Function(Function),
+    Struct(Struct),
 }
 
 #[derive(Debug)]
@@ -19,9 +21,28 @@ pub struct Function {
     pub body: Box<Expression>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub struct Struct {
+    pub name: Qualifier,
+    pub attributes: Vec<(String, CeriumType)>,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct Qualifier {
     pub names: Vec<String>,
+}
+
+impl Display for Qualifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut iter = self.names.iter();
+        if let Some(first) = iter.next() {
+            f.write_str(first)?;
+        }
+        for name in iter {
+            f.write_str(name)?;
+        }
+        Ok(())
+    }
 }
 
 

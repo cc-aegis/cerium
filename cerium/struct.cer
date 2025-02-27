@@ -1,0 +1,13 @@
+struct Vec2 {
+    x: f16,
+    y: f16,
+}
+
+fn math::sqrt(base: f16) -> f16 {
+    let approx = ((base alias u16 + 15360) >> 1) alias f16;
+    (base / approx + approx) * 0.5
+}
+
+fn Vec2::abs(vec2: &Vec2) -> f16 {
+    math::sqrt(vec2.x * vec2.x + vec2.y * vec2.y)
+}

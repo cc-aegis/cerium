@@ -2,11 +2,11 @@ use std::iter::Peekable;
 use std::ops::Range;
 use crate::error::CompilerError;
 use crate::lexer::{Lexer, Token};
-use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Subtraction, TypeAlias, While};
+use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Struct, Subtraction, TypeAlias, While};
 use crate::parser::cerium_type::CeriumType;
 
-mod ast;
-mod cerium_type;
+pub mod ast;
+pub mod cerium_type;
 
 pub struct Parser<'a> {
     lexer: Peekable<Lexer<'a>>,
@@ -149,9 +149,36 @@ impl Parser<'_> {
         }))
     }
 
+    fn parse_struct(&mut self) -> Result<Definition, CompilerError> {
+        expect_token!(self.lexer, (_, Token::Struct), {});
+        let name = self.parse_qualifier()?.1;
+        let mut attributes = Vec::new();
+        expect_token!(self.lexer, (_, Token::LBrace), {});
+        loop {
+            if matches!(self.lexer.peek(), Some(Ok((_, Token::RBrace)))) {
+                break;
+            }
+
+            let name = expect_token!(self.lexer, (range, Token::Ident(ident)), ident);
+            expect_token!(self.lexer, (_, Token::Colon), {});
+            let param_type = self.parse_type()?.1;
+            attributes.push((name, param_type));
+
+            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {
+                break;
+            }
+        }
+        expect_token!(self.lexer, (_, Token::RBrace), {});
+        Ok(Definition::Struct(Struct {
+            name,
+            attributes,
+        }))
+    }
+
     fn parse_definition(&mut self) -> Option<Result<Definition, CompilerError>> {
         match self.lexer.peek()? {
             Ok((_, Token::Fn)) => Some(self.parse_function()),
+            Ok((_, Token::Struct)) => Some(self.parse_struct()),
             Ok((range, token)) => {
                 let (range, token) = self.lexer.next().unwrap().unwrap();
                 Some(Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError { range, found: token })))

@@ -1,0 +1,7 @@
+static sqr: &fn(f16)->f16 = &fn(base) {
+    base * base
+}
+
+fn main() {
+    let sixteen = (*sqr)(4);
+}

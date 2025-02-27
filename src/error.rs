@@ -1,6 +1,9 @@
 use std::ops::{Add, Range};
 use colored::{Color, Colorize};
+use crate::compiler::error::MismatchedTypesError;
 use crate::lexer::error::SyntaxError;
+use crate::parser::ast::Qualifier;
+use crate::parser::cerium_type::CeriumType;
 use crate::parser::UnexpectedTokenError;
 
 #[derive(Clone, Debug)]
@@ -8,6 +11,7 @@ pub enum CompilerError {
     SyntaxError(SyntaxError),
     UnexpectedTokenError(UnexpectedTokenError),
     MissingTokenError,
+    MismatchedTypesError(MismatchedTypesError),
 }
 
 fn str_lines_within_range(src: &str, range: Range<usize>) -> Vec<(usize, Range<usize>, &str)> {
@@ -69,6 +73,15 @@ impl CompilerError {
                     "{0}{1}\n{underlined}",
                     "Syntax Error".color(Color::Red),
                     ": unexpected ending".color(Color::BrightWhite),
+                )
+            },
+            CompilerError::MismatchedTypesError(MismatchedTypesError { expected, actual, range }) => {
+                let lines = str_lines_within_range(src, range.clone());
+                let underlined = format_underline(lines);
+                format!(
+                    "{0}{1}\n{underlined}",
+                    "Type Error".color(Color::Red),
+                    format!(": found mismatched type '{actual:?}', expected '{expected:?}'").color(Color::BrightWhite),
                 )
             }
         }
