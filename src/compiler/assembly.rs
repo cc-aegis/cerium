@@ -5,6 +5,7 @@ pub enum Instruction {
     Label(String),
     Mov(Operand, Operand),
     Add(Operand, Operand),
+    Fadd(Operand, Operand),
     Ret,
 }
 
@@ -26,6 +27,7 @@ impl Display for Instruction {
             Instruction::Label(label) => write!(f, "{label}:"),
             Instruction::Mov(lhs, rhs) => write!(f, "    mov {lhs} {rhs}"),
             Instruction::Add(lhs, rhs) => write!(f, "    add {lhs} {rhs}"),
+            Instruction::Fadd(lhs, rhs) => write!(f, "    fadd {lhs} {rhs}"),
             Instruction::Ret => write!(f, "    ret"),
         }
     }

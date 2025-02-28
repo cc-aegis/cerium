@@ -7,17 +7,19 @@ use crate::error::CompilerError;
 
 pub mod lexer;
 pub mod error;
-mod parser;
+pub mod parser;
 mod compiler;
 
 fn main() {
     let code = include_str!("../cerium/simple.cer");
-    //println!("{code}");
-    let lexer = lexer::Lexer::new(code);
-    let mut parser = parser::Parser::new(lexer);
-    match parser.parse() {
-        Ok(program) => {
-            let _ = dbg!(compile(program));
+    match compile(code) {
+        Ok(asm) => {
+            let asm = asm
+                .into_iter()
+                .map(|inst| inst.to_string())
+                .collect::<Vec<String>>()
+                .join("\n");
+            println!("{asm}");
         },
         Err(err) => println!("{}", err.format(code)),
     }

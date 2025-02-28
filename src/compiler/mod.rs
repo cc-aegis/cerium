@@ -1,8 +1,9 @@
 use crate::compiler::assembly::{Instruction, Operand, Register};
-use crate::compiler::error::MismatchedTypesError;
+use crate::compiler::error::MismatchedReturnTypeError;
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
-use crate::parser::ast::{Definition, Expression, Function, Program};
+use crate::{lexer, parser};
+use crate::parser::ast::{Definition, Expression, Function, Program, Scope};
 use crate::parser::cerium_type::CeriumType;
 
 mod declarations;
@@ -13,11 +14,16 @@ mod assembly;
 pub mod error;
 mod vars;
 
-pub fn compile(program: Program) {
-    dbg!(program.parse_structure());
+pub fn compile(code: &str) -> Result<Vec<Instruction>, CompilerError> {
+    let lexer = lexer::Lexer::new(code);
+    let mut parser = parser::Parser::new(lexer);
+    let program = parser.parse()?;
+    let _ = program.parse_structure();
+    let mut result = Vec::new();
     for def in program.definitions {
-        println!("{}", def.compile().unwrap().into_iter().map(|inst| inst.to_string()).collect::<Vec<String>>().join("\n"));
+        result.extend(def.compile()?);
     }
+    Ok(result)
 }
 
 impl Definition {
@@ -33,19 +39,18 @@ impl Function {
     fn compile(self) -> Result<Vec<Instruction>, CompilerError> {
         let mut result = vec![Instruction::Label(self.name.to_string())];
         let result_range = match &*self.body {
-            Expression::Scope(range, scope) => scope.instructions
-                .last()
-                .map(|e| e.range())
-                .unwrap_or(range.clone()),
+            Expression::Scope(_, Scope { value: Some(value), .. }) => value.range(),
             expression => expression.range(),
         };
         let mut vars = Vars::new(self.parameters);
         let (mut body, return_type) = self.body.compile_into(&mut vars, Operand::Direct(Register::R0))?;
         result.append(&mut body);
+        result.push(Instruction::Ret);
         if self.return_type == return_type {
             Ok(result)
         } else {
-            Err(CompilerError::MismatchedTypesError(MismatchedTypesError {
+            Err(CompilerError::MismatchedReturnTypeError(MismatchedReturnTypeError {
+                function_name: self.name,
                 expected: self.return_type,
                 actual: return_type,
                 range: result_range,

@@ -39,7 +39,7 @@ impl Display for Qualifier {
             f.write_str(first)?;
         }
         for name in iter {
-            f.write_str(name)?;
+            write!(f, "::{name}")?;
         }
         Ok(())
     }

@@ -99,7 +99,7 @@ impl Addition {
                 let mut result = Vec::new();
                 result.extend(lhs_inst);
                 result.extend(rhs_inst);
-                result.push(Instruction::Add(target, rhs_op));
+                result.push(Instruction::Fadd(target, rhs_op));
                 Ok((result, Some(CeriumType::F16)))
             },
             (Some(return_type), Some((rhs_op, CeriumType::U16))) if matches!(return_type, CeriumType::Pointer(_)) => {

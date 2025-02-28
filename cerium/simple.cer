@@ -1,3 +1,11 @@
-fn add(x: u16, y: u16, z: u16) -> u16 {
+fn add_three_u16(x: u16, y: u16, z: u16) -> u16 {
     x + y + z
+}
+
+fn add_two_f16(x: f16, y: f16) -> f16 {
+    x + y
+}
+
+fn offset_pointer(ptr: &any, rel: u16) -> &any {
+    ptr + rel
 }
