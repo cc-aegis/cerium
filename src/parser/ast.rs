@@ -16,7 +16,7 @@ pub enum Definition {
 #[derive(Debug)]
 pub struct Function {
     pub name: Qualifier,
-    pub parameters: Vec<(String, CeriumType)>,
+    pub parameters: Vec<(Qualifier, CeriumType)>,
     pub return_type: Option<CeriumType>,
     pub body: Box<Expression>,
 }

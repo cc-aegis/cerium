@@ -1,19 +1,27 @@
-use crate::compiler::assembly::{Instruction, Operand};
+use crate::compiler::assembly::{Instruction, Operand, Register};
+use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
 use crate::parser::ast::Expression;
 use crate::parser::cerium_type::CeriumType;
 
 impl Expression {
-    pub(crate) fn compile(self) -> Result<(Vec<Instruction>, Option<Operand>, Option<CeriumType>), CompilerError> {
+    pub(crate) fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
         match self {
             Expression::Scope(_, _) => todo!(),
             Expression::TypeCast(_, _) => todo!(),
             Expression::TypeAlias(_, _) => todo!(),
-            Expression::Integer(_, _) => todo!(),
+            Expression::Integer(_, int) => {
+                Ok((Vec::new(), Some((Operand::Direct(Register::RN(int)), CeriumType::U16))))
+            },
             Expression::Float(_, _) => todo!(),
             Expression::Boolean(_, _) => todo!(),
             Expression::Nullptr(_) => todo!(),
-            Expression::Variable(_, _) => todo!(),
+            Expression::Variable(_, var) => {
+                match vars.find(&var) {
+                    Some((op, c_type)) => Ok((Vec::new(), Some((op, c_type.clone())))),
+                    None => todo!("error"),
+                }
+            },
             Expression::FieldAccess(_, _) => todo!(),
             Expression::ArrayAccess(_, _) => todo!(),
             Expression::FunctionCall(_, _) => todo!(),

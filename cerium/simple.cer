@@ -1,3 +1,3 @@
-fn add(x: u16, y: u16) -> f16 {
-    x + y
+fn add(x: u16, y: u16, z: u16) -> u16 {
+    x + y + z
 }

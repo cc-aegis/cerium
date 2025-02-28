@@ -3,12 +3,24 @@ use crate::compiler::assembly::{Operand, Register};
 use crate::parser::ast::Qualifier;
 use crate::parser::cerium_type::CeriumType;
 
-struct Vars {
+pub struct Vars {
     globals: (),
-    parameters: Vec<(Option<Qualifier>, CeriumType)>,
+    parameters: Vec<(Qualifier, CeriumType)>,
     vars: Vec<(Option<Qualifier>, CeriumType)>,
     max_size: usize,
     scopes: Vec<usize>,
+}
+
+impl Vars {
+    pub fn new(parameters: Vec<(Qualifier, CeriumType)>) -> Self {
+        Vars {
+            globals: (),
+            parameters,
+            vars: Vec::new(),
+            max_size: 0,
+            scopes: Vec::new(),
+        }
+    }
 }
 
 fn var_op(idx: usize) -> Operand {
@@ -25,36 +37,37 @@ fn var_op(idx: usize) -> Operand {
 }
 
 impl Vars {
-    fn push(&mut self, name: Option<Qualifier>, var_type: CeriumType) -> Operand {
+    pub fn push(&mut self, name: Option<Qualifier>, var_type: CeriumType) -> Operand {
         self.vars.push((name, var_type));
         self.max_size = self.max_size.max(self.vars.len());
         var_op(self.vars.len() - 1)
     }
 
-    fn pop(&mut self) {
+    pub fn pop(&mut self) {
         let _ = self.vars.pop();
     }
 
-    fn find(&self, name: &Qualifier) -> Option<(Operand, &CeriumType)> {
+    pub fn find(&self, name: &Qualifier) -> Option<(Operand, &CeriumType)> {
         for (idx, (var_name, var_type)) in self.vars.iter().enumerate().rev() {
             if var_name.as_ref().is_some_and(|it| *it == *name) {
                 return Some((var_op(idx), var_type));
             }
         }
+        let offset = self.parameters.len() as isize + 2;
         for (idx, (var_name, var_type)) in self.parameters.iter().enumerate().rev() {
-            if var_name.as_ref().is_some_and(|it| *it == *name) {
-                return Some((Operand::Indirect(Register::RN((idx as isize).sub(3).to_string())), var_type));
+            if *var_name == *name {
+                return Some((Operand::Indirect(Register::RN((idx as isize).sub(offset).to_string())), var_type));
             }
         }
         //todo: globals
         None
     }
 
-    fn begin_scope(&mut self) {
+    pub fn begin_scope(&mut self) {
         self.scopes.push(self.vars.len());
     }
 
-    fn end_scope(&mut self) {
+    pub fn end_scope(&mut self) {
         if let Some(len) = self.scopes.pop() {
             self.scopes.truncate(len);
         }

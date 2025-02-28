@@ -1,5 +1,6 @@
 use crate::compiler::assembly::{Instruction, Operand, Register};
 use crate::compiler::error::MismatchedTypesError;
+use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
 use crate::parser::ast::{Definition, Expression, Function, Program};
 use crate::parser::cerium_type::CeriumType;
@@ -15,7 +16,7 @@ mod vars;
 pub fn compile(program: Program) {
     dbg!(program.parse_structure());
     for def in program.definitions {
-        dbg!(def.compile());
+        println!("{}", def.compile().unwrap().into_iter().map(|inst| inst.to_string()).collect::<Vec<String>>().join("\n"));
     }
 }
 
@@ -38,7 +39,8 @@ impl Function {
                 .unwrap_or(range.clone()),
             expression => expression.range(),
         };
-        let (mut body, return_type) = self.body.compile_into(Operand::Direct(Register::R0))?;
+        let mut vars = Vars::new(self.parameters);
+        let (mut body, return_type) = self.body.compile_into(&mut vars, Operand::Direct(Register::R0))?;
         result.append(&mut body);
         if self.return_type == return_type {
             Ok(result)
