@@ -1,8 +1,10 @@
 use crate::compiler::assembly::{Instruction, Operand, Register};
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
-use crate::parser::ast::Expression;
+use crate::parser::ast::{Expression, Iter};
 use crate::parser::cerium_type::CeriumType;
+
+//TODO: rename to compile_ref?
 
 impl Expression {
     pub(crate) fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
@@ -46,11 +48,27 @@ impl Expression {
             Expression::Borrow(_, _) => todo!(),
             Expression::Negation(_, _) => todo!(),
             Expression::Deref(_, _) => todo!(),
+            Expression::Iter(_, iter) => iter.compile(vars),
+            Expression::Inversion(_, _) => todo!(),
             Expression::Let(_, _) => todo!(),
             Expression::If(_, _) => todo!(),
             Expression::For(_, _) => todo!(),
             Expression::While(_, _) => todo!(),
             Expression::Loop(_, _) => todo!(),
         }
+    }
+}
+
+impl Iter {
+    pub(crate) fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
+        let (mut asm, Some((op, outer_type))) = self.inner.compile(vars)? else {
+            todo!("error")
+        };
+        let CeriumType::Pointer(box inner_type) = outer_type else {
+            todo!("error")
+        };
+        let target_op = vars.push(None, inner_type.clone());
+        asm.push(Instruction::Readitr(target_op.clone(), op));
+        Ok((asm, Some((target_op, inner_type))))
     }
 }

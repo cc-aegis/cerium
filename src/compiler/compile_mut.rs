@@ -39,6 +39,8 @@ impl Expression {
             Expression::Borrow(_, _) => todo!(),
             Expression::Negation(_, _) => todo!(),
             Expression::Deref(_, _) => todo!(),
+            Expression::Iter(_, _) => todo!(),
+            Expression::Inversion(_, _) => todo!(),
             Expression::Let(_, _) => todo!(),
             Expression::If(_, _) => todo!(),
             Expression::For(_, _) => todo!(),

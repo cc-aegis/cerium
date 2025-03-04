@@ -13,6 +13,7 @@ mod compile_into;
 mod assembly;
 pub mod error;
 mod vars;
+mod compile_unit;
 
 pub fn compile(code: &str) -> Result<Vec<Instruction>, CompilerError> {
     let lexer = lexer::Lexer::new(code);

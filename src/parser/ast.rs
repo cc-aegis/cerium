@@ -82,6 +82,8 @@ pub enum Expression {
     Borrow(Range<usize>, Borrow),
     Negation(Range<usize>, Negation),
     Deref(Range<usize>, Deref),
+    Iter(Range<usize>, Iter),
+    Inversion(Range<usize>, Inversion),
     Let(Range<usize>, Let),
     If(Range<usize>, If),
     For(Range<usize>, For),
@@ -124,6 +126,8 @@ impl Expression {
             Expression::Borrow(range, _) => range,
             Expression::Negation(range, _) => range,
             Expression::Deref(range, _) => range,
+            Expression::Iter(range, _) => range,
+            Expression::Inversion(range, _) => range,
             Expression::Let(range, _) => range,
             Expression::If(range, _) => range,
             Expression::For(range, _) => range,
@@ -289,6 +293,16 @@ pub struct Negation {
 
 #[derive(Debug)]
 pub struct Deref {
+    pub inner: Box<Expression>
+}
+
+#[derive(Debug)]
+pub struct Iter {
+    pub inner: Box<Expression>
+}
+
+#[derive(Debug)]
+pub struct Inversion {
     pub inner: Box<Expression>
 }
 

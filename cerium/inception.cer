@@ -1,0 +1,19 @@
+fn add(x: u16, y: u16) -> u16 {
+    x + y
+}
+
+fn sub(x: u16, y: u16) -> u16 {
+    x - y
+}
+
+fn gen_fn(is_add: bool) -> fn(u16, u16) -> u16 {
+    if is_add {
+        add
+    } else {
+        sub
+    }
+}
+
+fn main() -> u16 {
+    gen_fn(true)(42, 27)
+}

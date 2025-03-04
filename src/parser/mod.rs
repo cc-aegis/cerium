@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::ops::Range;
 use crate::error::CompilerError;
 use crate::lexer::{Lexer, Token};
-use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Struct, Subtraction, TypeAlias, While};
+use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, Inversion, Iter, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Struct, Subtraction, TypeAlias, While};
 use crate::parser::cerium_type::CeriumType;
 
 pub mod ast;
@@ -377,6 +377,16 @@ impl Parser<'_> {
                 let inner = Box::new(self.parse_prefix_operation()?);
                 Ok(Expression::Deref(range.start..inner.range().end, Deref { inner }))
             },
+            Ok((_, Token::Circumflex)) => {
+                let range = self.lexer.next().unwrap().unwrap().0;
+                let inner = Box::new(self.parse_prefix_operation()?);
+                Ok(Expression::Iter(range.start..inner.range().end, Iter { inner }))
+            },
+            Ok((_, Token::Minus)) => {
+                let range = self.lexer.next().unwrap().unwrap().0;
+                let inner = Box::new(self.parse_prefix_operation()?);
+                Ok(Expression::Inversion(range.start..inner.range().end, Inversion { inner }))
+            },
             Ok(_) => self.parse_value(),
             Err(err) => Err(err.clone()),
         }
@@ -432,16 +442,16 @@ impl Parser<'_> {
             Some(_) => Some(Box::new(self.parse_expression()?)),
             None => None,
         };
-        // let initialization = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Step)))) {
-        //    Some(_) => Some(self.parse_expression()?),
-        //    None => None,
-        // };
+        let step = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Step)))) {
+            Some(_) => Some(Box::new(self.parse_expression()?)),
+            None => None,
+        };
         let body = self.parse_expression()?;
         Ok(Expression::For(start..body.range().end, For {
             counter,
             initialization,
             limit,
-            step: None,
+            step,
             body: Box::new(body),
         }))
     }

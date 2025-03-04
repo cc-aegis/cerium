@@ -1,4 +1,5 @@
 #![feature(result_flattening)]
+#![feature(box_patterns)]
 #![allow(unused)]
 extern crate core;
 
@@ -11,7 +12,7 @@ pub mod parser;
 mod compiler;
 
 fn main() {
-    let code = include_str!("../cerium/simple.cer");
+    let code = include_str!("../cerium/copy.cer");
     match compile(code) {
         Ok(asm) => {
             let asm = asm

@@ -9,6 +9,7 @@ pub struct Vars {
     vars: Vec<(Option<Qualifier>, CeriumType)>,
     max_size: usize,
     scopes: Vec<usize>,
+    label_counter: usize,
 }
 
 impl Vars {
@@ -19,6 +20,7 @@ impl Vars {
             vars: Vec::new(),
             max_size: 0,
             scopes: Vec::new(),
+            label_counter: 0,
         }
     }
 }
@@ -37,6 +39,10 @@ fn var_op(idx: usize) -> Operand {
 }
 
 impl Vars {
+    pub fn label(&mut self) -> String {
+        self.label_counter += 1;
+        format!(".L{}", self.label_counter - 1)
+    }
     pub fn push(&mut self, name: Option<Qualifier>, var_type: CeriumType) -> Operand {
         self.vars.push((name, var_type));
         self.max_size = self.max_size.max(self.vars.len());
