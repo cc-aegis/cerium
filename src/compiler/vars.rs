@@ -48,6 +48,12 @@ impl Vars {
         self.max_size = self.max_size.max(self.vars.len());
         var_op(self.vars.len() - 1)
     }
+    
+    pub fn alter_top_type(&mut self, var_type: CeriumType) {
+        if let Some((_, last)) = self.vars.last_mut() {
+            *last = var_type;
+        }
+    }
 
     pub fn pop(&mut self) {
         let _ = self.vars.pop();

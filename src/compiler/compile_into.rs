@@ -1,7 +1,8 @@
 use crate::compiler::assembly::{Instruction, Operand, Register};
+use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError};
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
-use crate::parser::ast::{Addition, Expression, For, Inversion, Scope, Subtraction};
+use crate::parser::ast::{Addition, Assignment, Expression, For, Inversion, Scope, Subtraction, TypeAlias};
 use crate::parser::cerium_type::CeriumType;
 
 impl Expression {
@@ -9,7 +10,7 @@ impl Expression {
         match self {
             Expression::Scope(_, scope) => scope.compile_into(vars, target),
             Expression::TypeCast(_, _) => todo!(),
-            Expression::TypeAlias(_, _) => todo!(),
+            Expression::TypeAlias(_, alias) => alias.compile_into(vars, target),
             Expression::Integer(_, int) => {
                 Ok((vec![Instruction::Mov(target, Operand::Direct(Register::RN(int)))], Some(CeriumType::U16)))
             },
@@ -27,7 +28,7 @@ impl Expression {
             Expression::FieldAccess(_, _) => todo!(),
             Expression::ArrayAccess(_, _) => todo!(),
             Expression::FunctionCall(_, _) => todo!(),
-            Expression::Assignment(_, _) => todo!(),
+            Expression::Assignment(_, assign) => assign.compile_into(vars),
             Expression::LogicalAnd(_, _) => todo!(),
             Expression::LogicalOr(_, _) => todo!(),
             Expression::LessThan(_, _) => todo!(),
@@ -75,6 +76,31 @@ impl Scope {
         };
         vars.end_scope();
         Ok((result, return_type))
+    }
+}
+
+impl TypeAlias {
+    fn compile_into(self, vars: &mut Vars, target: Operand) -> Result<(Vec<Instruction>, Option<CeriumType>), CompilerError> {
+        //todo: "attempted to use unit type value"
+        let (asm, Some(c_type)) = self.value.compile_into(vars, target)? else {
+            todo!()
+        };
+        Ok((asm, Some(*self.target_type)))
+    }
+}
+
+impl Assignment {
+    //x = y, *x = y, ^x = y, x[idx] = y, x.field = y
+    fn compile_into(self, vars: &mut Vars) -> Result<Vec<Instruction>, CompilerError> {
+        match self.target {
+            box Expression::Variable(_, var) => {
+                todo!()
+            },
+            box Expression::Iter(range, iter) => {
+                todo!()
+            }
+            _ => todo!("error or generate code")
+        }
     }
 }
 

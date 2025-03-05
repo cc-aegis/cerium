@@ -2,7 +2,7 @@ use crate::compiler::assembly::{Instruction, Operand, Register};
 use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError};
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
-use crate::parser::ast::{Assignment, Expression, Scope};
+use crate::parser::ast::{Assignment, Expression, Let, Scope};
 use crate::parser::cerium_type::CeriumType;
 
 impl Expression {
@@ -51,7 +51,7 @@ impl Expression {
             Expression::Deref(_, _) => todo!(),
             Expression::Iter(_, _) => todo!(),
             Expression::Inversion(_, _) => todo!(),
-            Expression::Let(_, _) => todo!(),
+            Expression::Let(_, decl) => decl.compile_unit(vars),
             Expression::If(_, _) => todo!(),
             Expression::For(_, for_loop) => todo!(),
             Expression::While(_, _) => todo!(),
@@ -122,3 +122,16 @@ impl Assignment {
     }
 }
 
+impl Let {
+    fn compile_unit(self, vars: &mut Vars) -> Result<Vec<Instruction>, CompilerError> {
+        let addr = vars.push(Some(self.name), CeriumType::Any);
+        vars.begin_scope();
+        let (asm, c_type) = self.value.compile_into(vars, addr.clone())?;
+        vars.end_scope();
+        let Some(c_type) = c_type else {
+            todo!("unit error")
+        };
+        vars.alter_top_type(c_type.clone());
+        Ok(asm)
+    }
+}
