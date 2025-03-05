@@ -1,6 +1,6 @@
 use std::ops::{Add, Range};
 use colored::{Color, Colorize};
-use crate::compiler::error::MismatchedReturnTypeError;
+use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError, MismatchedReturnTypeError};
 use crate::lexer::error::SyntaxError;
 use crate::parser::ast::Qualifier;
 use crate::parser::cerium_type::{format_type, CeriumType};
@@ -12,6 +12,8 @@ pub enum CompilerError {
     UnexpectedTokenError(UnexpectedTokenError),
     MissingTokenError,
     MismatchedReturnTypeError(MismatchedReturnTypeError),
+    MismatchedAssignTypeError(MismatchedAssignTypeError),
+    InvalidDerefError(InvalidDerefError),
 }
 
 fn str_lines_within_range(src: &str, range: Range<usize>) -> Vec<(usize, Range<usize>, &str)> {
@@ -86,6 +88,31 @@ impl CompilerError {
                         ": function '{function_name}' has return value of type {0}, found value of type {1}",
                         format_type(expected),
                         format_type(actual),
+                    ).color(Color::BrightWhite),
+                )
+            },
+            CompilerError::MismatchedAssignTypeError(MismatchedAssignTypeError { dst_range, dst_type, src_range, src_type }) => {
+                let dst_lines = format_underline(str_lines_within_range(src, dst_range.clone()));
+                let src_lines = format_underline(str_lines_within_range(src, src_range.clone()));
+                format!(
+                    "{0}{1}\n{dst_lines}{src_lines}",
+                    "Type Error".color(Color::Red),
+                    format!(
+                        ": wrote value of type {0} to pointer with inner type {1}",
+                        format_type(src_type),
+                        format_type(dst_type),
+                    ).color(Color::BrightWhite),
+                )
+            },
+            CompilerError::InvalidDerefError(InvalidDerefError { range, found }) => {
+                let lines = str_lines_within_range(src, range.clone());
+                let underlined = format_underline(lines);
+                format!(
+                    "{0}{1}\n{underlined}",
+                    "Type Error".color(Color::Red),
+                    format!(
+                        ": attempted to deref value of type {0}, must be pointer",
+                        format_type(found),
                     ).color(Color::BrightWhite),
                 )
             }

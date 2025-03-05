@@ -1,4 +1,5 @@
 use crate::compiler::assembly::{Instruction, Operand, Register};
+use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError};
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
 use crate::parser::ast::{Assignment, Expression, Scope};
@@ -83,19 +84,32 @@ impl Assignment {
             box Expression::Variable(_, var) => {
                 todo!()
             },
-            box Expression::Iter(_, iter) => {
+            box Expression::Iter(range, iter) => {
+                let ranges = (iter.inner.range(), self.value.range());
                 vars.begin_scope();
                 let (lhs_asm, Some((lhs_op, lhs_type))) = iter.inner.compile(vars)? else {
-                    todo!("error")
+                    return Err(CompilerError::InvalidDerefError(InvalidDerefError {
+                        range,
+                        found: None,
+                    }));
                 };
                 let CeriumType::Pointer(box inner_type) = lhs_type else {
-                    todo!("error")
+                    return Err(CompilerError::InvalidDerefError(InvalidDerefError {
+                        range,
+                        found: Some(lhs_type),
+                    }));
                 };
+                let value_range = self.value.range();
                 let (rhs_asm, Some((rhs_op, rhs_type))) = self.value.compile(vars)? else {
-                    todo!("error")
+                    todo!("unit assign error")
                 };
                 if inner_type != rhs_type {
-                    todo!("error")
+                    return Err(CompilerError::MismatchedAssignTypeError(MismatchedAssignTypeError {
+                        dst_range: ranges.0,
+                        dst_type: Some(inner_type),
+                        src_range: ranges.1,
+                        src_type: Some(rhs_type),
+                    }))
                 }
                 let mut result = lhs_asm;
                 result.extend(rhs_asm);
