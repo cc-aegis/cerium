@@ -2,7 +2,7 @@ use crate::compiler::assembly::{Instruction, Operand, Register};
 use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError};
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
-use crate::parser::ast::{Addition, Assignment, Expression, For, Inversion, Scope, Subtraction, TypeAlias};
+use crate::parser::ast::{Addition, Assignment, Deref, Expression, For, Inversion, Scope, Subtraction, TypeAlias};
 use crate::parser::cerium_type::CeriumType;
 
 impl Expression {
@@ -28,7 +28,7 @@ impl Expression {
             Expression::FieldAccess(_, _) => todo!(),
             Expression::ArrayAccess(_, _) => todo!(),
             Expression::FunctionCall(_, _) => todo!(),
-            Expression::Assignment(_, assign) => assign.compile_into(vars),
+            Expression::Assignment(_, assign) => assign.compile_into(vars, target),
             Expression::LogicalAnd(_, _) => todo!(),
             Expression::LogicalOr(_, _) => todo!(),
             Expression::LessThan(_, _) => todo!(),
@@ -48,7 +48,7 @@ impl Expression {
             Expression::Division(_, _) => todo!(),
             Expression::Borrow(_, _) => todo!(),
             Expression::Negation(_, _) => todo!(),
-            Expression::Deref(_, _) => todo!(),
+            Expression::Deref(_, deref) => deref.compile_into(vars, target),
             Expression::Iter(_, _) => todo!(),
             Expression::Inversion(_, _) => todo!(),
             Expression::Let(_, _) => todo!(),
@@ -91,13 +91,30 @@ impl TypeAlias {
 
 impl Assignment {
     //x = y, *x = y, ^x = y, x[idx] = y, x.field = y
-    fn compile_into(self, vars: &mut Vars) -> Result<Vec<Instruction>, CompilerError> {
+    fn compile_into(self, vars: &mut Vars, target: Operand) -> Result<(Vec<Instruction>, Option<CeriumType>), CompilerError> {
         match self.target {
             box Expression::Variable(_, var) => {
                 todo!()
             },
             box Expression::Iter(range, iter) => {
                 todo!()
+            },
+            box Expression::Deref(_, deref) => {
+                let (value_asm, Some(value_type)) = self.value.compile_into(vars, target.clone())? else {
+                    todo!("error")
+                };
+                vars.begin_scope();
+                let (target_asm, Some((target_op, target_type))) = deref.inner.compile(vars)? else {
+                    todo!("error");
+                };
+                if target_type != CeriumType::Pointer(Box::new(value_type.clone())) {
+                    todo!("error")
+                }
+                let mut result = target_asm;
+                result.extend(value_asm);
+                result.push(Instruction::Write(target_op, target));
+                vars.end_scope();
+                Ok((result, Some(value_type)))
             }
             _ => todo!("error or generate code")
         }
@@ -178,9 +195,26 @@ impl Subtraction {
                 Ok((result, Some(return_type)))
             }
             _ => {
-                todo!("error incompatible types for operator 'Plus': 'Some(...)' and 'Some(...)'")
+                todo!("error incompatible types for operator 'Minus': 'Some(...)' and 'Some(...)'")
             }
         }
+    }
+}
+
+impl Deref {
+    fn compile_into(self, vars: &mut Vars, target: Operand) -> Result<(Vec<Instruction>, Option<CeriumType>), CompilerError> {
+        //EITHER compile_into target -> read target target OR compile -> read target op
+        // todo: evaluate ^
+        vars.begin_scope();
+        let (mut result, Some((op, c_type))) = self.inner.compile(vars)? else {
+            todo!("error")
+        };
+        let CeriumType::Pointer(box inner) = c_type else {
+            todo!("error")
+        };
+        vars.end_scope();
+        result.push(Instruction::Read(target, op));
+        Ok((result, Some(inner)))
     }
 }
 

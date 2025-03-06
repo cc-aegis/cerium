@@ -1,4 +1,4 @@
 fn mem::alloc(size: u16) -> &any {
-    let heap = (10 alias &any);
+    let heap = (10 alias &&any);
     *heap = *heap - size
 }

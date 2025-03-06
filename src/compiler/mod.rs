@@ -18,7 +18,7 @@ mod compile_unit;
 pub fn compile(code: &str) -> Result<Vec<Instruction>, CompilerError> {
     let lexer = lexer::Lexer::new(code);
     let mut parser = parser::Parser::new(lexer);
-    let program = parser.parse()?;
+    let program = dbg!(parser.parse()?);
     let _ = program.parse_structure();
     let mut result = Vec::new();
     for def in program.definitions {

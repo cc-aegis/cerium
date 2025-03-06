@@ -12,6 +12,8 @@ pub enum Instruction {
     Jrnzdec(Operand, Operand),
     Readitr(Operand, Operand),
     Writeitr(Operand, Operand),
+    Write(Operand, Operand),
+    Read(Operand, Operand),
     Ret,
 }
 
@@ -33,13 +35,15 @@ impl Display for Instruction {
             Instruction::Label(label) => write!(f, "{label}:"),
             Instruction::Mov(lhs, rhs) => write!(f, "    mov {lhs} {rhs}"),
             Instruction::Add(lhs, rhs) => write!(f, "    add {lhs} {rhs}"),
-            Instruction::Sub(lhs, rhs) => write!(f, "    add {lhs} {rhs}"),
+            Instruction::Sub(lhs, rhs) => write!(f, "    sub {lhs} {rhs}"),
             Instruction::Fadd(lhs, rhs) => write!(f, "    fadd {lhs} {rhs}"),
-            Instruction::Fsub(lhs, rhs) => write!(f, "    fadd {lhs} {rhs}"),
+            Instruction::Fsub(lhs, rhs) => write!(f, "    fsub {lhs} {rhs}"),
             Instruction::Jmp(label) => write!(f, "    jmp {label}"),
             Instruction::Jrnzdec(dst, src) => write!(f, "    jrnzdec {dst} {src}"),
             Instruction::Readitr(dst, src) => write!(f, "    readitr {dst} {src}"),
             Instruction::Writeitr(cond, label) => write!(f, "    writeitr {cond} {label}"),
+            Instruction::Write(cond, label) => write!(f, "    write {cond} {label}"),
+            Instruction::Read(cond, label) => write!(f, "    read {cond} {label}"),
             Instruction::Ret => write!(f, "    ret"),
         }
     }
