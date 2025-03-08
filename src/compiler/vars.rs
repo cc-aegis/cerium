@@ -1,10 +1,11 @@
+use std::collections::HashMap;
 use std::ops::Sub;
 use crate::compiler::assembly::{Operand, Register};
 use crate::parser::ast::Qualifier;
 use crate::parser::cerium_type::CeriumType;
 
-pub struct Vars {
-    globals: (),
+pub struct Vars<'a> {
+    globals: &'a HashMap<Qualifier, CeriumType>,
     parameters: Vec<(Qualifier, CeriumType)>,
     vars: Vec<(Option<Qualifier>, CeriumType)>,
     max_size: usize,
@@ -12,10 +13,10 @@ pub struct Vars {
     label_counter: usize,
 }
 
-impl Vars {
-    pub fn new(parameters: Vec<(Qualifier, CeriumType)>) -> Self {
+impl <'a> Vars<'a> {
+    pub fn new(globals: &'a HashMap<Qualifier, CeriumType>, parameters: Vec<(Qualifier, CeriumType)>) -> Self {
         Vars {
-            globals: (),
+            globals,
             parameters,
             vars: Vec::new(),
             max_size: 0,
@@ -38,7 +39,7 @@ fn var_op(idx: usize) -> Operand {
     }
 }
 
-impl Vars {
+impl Vars<'_> {
     pub fn label(&mut self) -> String {
         self.label_counter += 1;
         format!(".L{}", self.label_counter - 1)
@@ -71,7 +72,11 @@ impl Vars {
                 return Some((Operand::Indirect(Register::RN((idx as isize).sub(offset).to_string())), var_type));
             }
         }
-        //todo: globals
+        for (global_name, global_type) in self.globals {
+            if *global_name == *name {
+                return Some((Operand::Direct(Register::RN(global_name.to_string())), global_type))
+            }
+        }
         None
     }
 

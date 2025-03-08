@@ -18,6 +18,9 @@ impl Program {
                 Definition::Struct(structure) => {
                     structs.insert(structure.name.clone(), structure.attributes.clone());
                 },
+                Definition::Const(const_val) => {
+                    globals.insert(const_val.name.clone(), const_val.const_type.clone());
+                }
             }
         }
         (structs, globals)

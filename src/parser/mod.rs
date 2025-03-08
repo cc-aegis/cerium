@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::ops::Range;
 use crate::error::CompilerError;
 use crate::lexer::{Lexer, Token};
-use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, Inversion, Iter, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Struct, Subtraction, TypeAlias, While};
+use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Const, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, Inversion, Iter, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Struct, Subtraction, TypeAlias, While};
 use crate::parser::cerium_type::CeriumType;
 
 pub mod ast;
@@ -150,6 +150,21 @@ impl Parser<'_> {
         }))
     }
 
+    fn parse_const(&mut self) -> Result<Definition, CompilerError> {
+        expect_token!(self.lexer, (_, Token::Const), {});
+        let name = self.parse_qualifier()?.1;
+        expect_token!(self.lexer, (_, Token::Colon), {});
+        let const_type = self.parse_type()?.1;
+        expect_token!(self.lexer, (_, Token::Assign), {});
+        let value = self.parse_expression()?;
+        expect_token!(self.lexer, (_, Token::Semicolon), {});
+        Ok(Definition::Const(Const {
+            name,
+            const_type,
+            value,
+        }))
+    }
+
     fn parse_struct(&mut self) -> Result<Definition, CompilerError> {
         expect_token!(self.lexer, (_, Token::Struct), {});
         let name = self.parse_qualifier()?.1;
@@ -180,6 +195,7 @@ impl Parser<'_> {
         match self.lexer.peek()? {
             Ok((_, Token::Fn)) => Some(self.parse_function()),
             Ok((_, Token::Struct)) => Some(self.parse_struct()),
+            Ok((_, Token::Const)) => Some(self.parse_const()),
             Ok((range, token)) => {
                 let (range, token) = self.lexer.next().unwrap().unwrap();
                 Some(Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError { range, found: token })))

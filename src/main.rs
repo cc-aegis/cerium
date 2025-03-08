@@ -12,7 +12,7 @@ pub mod parser;
 mod compiler;
 
 fn main() {
-    let code = include_str!("../cerium/malloc.cer");
+    let code = include_str!("../cerium/const_malloc.cer");
     match compile(code) {
         Ok(asm) => {
             let asm = asm

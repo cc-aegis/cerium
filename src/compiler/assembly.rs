@@ -3,6 +3,8 @@ use std::fmt::{write, Display, Formatter};
 #[derive(Debug)]
 pub enum Instruction {
     Label(String),
+    Define(String, Operand),
+    Dw(Vec<Operand>),
     Mov(Operand, Operand),
     Add(Operand, Operand),
     Sub(Operand, Operand),
@@ -33,6 +35,14 @@ impl Display for Instruction {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Instruction::Label(label) => write!(f, "{label}:"),
+            Instruction::Define(name, op) => write!(f, "#define {name} {op}"),
+            Instruction::Dw(operands) => {
+                write!(f, "    dw")?;
+                for operand in operands {
+                    write!(f, " {}", operand)?;
+                }
+                Ok(())
+            },
             Instruction::Mov(lhs, rhs) => write!(f, "    mov {lhs} {rhs}"),
             Instruction::Add(lhs, rhs) => write!(f, "    add {lhs} {rhs}"),
             Instruction::Sub(lhs, rhs) => write!(f, "    sub {lhs} {rhs}"),

@@ -10,6 +10,7 @@ pub struct Program {
 #[derive(Debug)]
 pub enum Definition {
     Function(Function),
+    Const(Const),
     Struct(Struct),
 }
 
@@ -19,6 +20,13 @@ pub struct Function {
     pub parameters: Vec<(Qualifier, CeriumType)>,
     pub return_type: Option<CeriumType>,
     pub body: Box<Expression>,
+}
+
+#[derive(Debug)]
+pub struct Const {
+    pub name: Qualifier,
+    pub const_type: CeriumType,
+    pub value: Expression,
 }
 
 #[derive(Debug, Clone)]
