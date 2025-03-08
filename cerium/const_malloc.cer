@@ -3,3 +3,7 @@ const HEAD: &&any = &nullptr;
 fn alloc(size: u16) -> &any {
     *HEAD = *HEAD - size
 }
+
+fn free(ptr: &any) {
+    // haha you thought
+}
