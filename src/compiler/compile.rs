@@ -1,7 +1,7 @@
 use crate::compiler::assembly::{Instruction, Operand, Register};
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
-use crate::parser::ast::{Expression, Iter};
+use crate::parser::ast::{Addition, Deref, Expression, Iter, Subtraction, TypeAlias};
 use crate::parser::cerium_type::CeriumType;
 
 //TODO: rename to compile_ref?
@@ -11,12 +11,12 @@ impl Expression {
         match self {
             Expression::Scope(_, _) => todo!(),
             Expression::TypeCast(_, _) => todo!(),
-            Expression::TypeAlias(_, _) => todo!(),
+            Expression::TypeAlias(_, type_alias) => type_alias.compile(vars),
             Expression::Integer(_, int) => {
                 Ok((Vec::new(), Some((Operand::Direct(Register::RN(int)), CeriumType::U16))))
             },
             Expression::Float(_, _) => todo!(),
-            Expression::Boolean(_, _) => todo!(),
+            Expression::Boolean(_, boolean) => Ok((Vec::new(), Some((Operand::Direct(Register::RN(format!("#{boolean}"))), CeriumType::Bool)))),
             Expression::Nullptr(_) => todo!(),
             Expression::Variable(_, var) => {
                 match vars.find(&var) {
@@ -41,13 +41,13 @@ impl Expression {
             Expression::BitwiseAnd(_, _) => todo!(),
             Expression::LeftShift(_, _) => todo!(),
             Expression::RightShift(_, _) => todo!(),
-            Expression::Addition(_, _) => todo!(),
-            Expression::Subtraction(_, _) => todo!(),
+            Expression::Addition(_, add) => add.compile(vars),
+            Expression::Subtraction(_, sub) => sub.compile(vars),
             Expression::Multiplication(_, _) => todo!(),
             Expression::Division(_, _) => todo!(),
             Expression::Borrow(_, _) => todo!(),
             Expression::Negation(_, _) => todo!(),
-            Expression::Deref(_, _) => todo!(),
+            Expression::Deref(_, deref) => deref.compile(vars),
             Expression::Iter(_, iter) => iter.compile(vars),
             Expression::Inversion(_, _) => todo!(),
             Expression::Let(_, _) => todo!(),
@@ -59,8 +59,71 @@ impl Expression {
     }
 }
 
+impl TypeAlias {
+    pub fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
+        let (asm, Some((op, _))) = self.value.compile(vars)? else {
+            todo!("error: unit type")
+        };
+        Ok((asm, Some((op, *self.target_type))))
+    }
+}
+
+impl Addition {
+    pub fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
+        let (mut result_asm, Some((lhs_op, lhs_type))) = self.lhs.compile_mut(vars)? else {
+            todo!("error")
+        };
+        vars.begin_scope();
+        let (rhs_asm, Some((rhs_op, rhs_type))) = self.rhs.compile(vars)? else {
+            todo!()
+        };
+        vars.end_scope();
+        let final_inst = match (&lhs_type, rhs_type) {
+            (CeriumType::U16, CeriumType::U16) => Instruction::Add(lhs_op.clone(), rhs_op),
+            (CeriumType::I16, CeriumType::I16) => Instruction::Add(lhs_op.clone(), rhs_op),
+            (CeriumType::F16, CeriumType::F16) => Instruction::Fadd(lhs_op.clone(), rhs_op),
+            (CeriumType::Pointer(_), CeriumType::U16) => Instruction::Add(lhs_op.clone(), rhs_op),
+            _ => todo!("error")
+        };
+        result_asm.extend(rhs_asm);
+        result_asm.push(final_inst);
+        Ok((result_asm, Some((lhs_op, lhs_type))))
+
+    }
+}
+
+impl Subtraction {
+    pub fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
+        let (mut result_asm, Some((lhs_op, lhs_type))) = self.lhs.compile_mut(vars)? else {
+            todo!("error")
+        };
+        vars.begin_scope();
+        let (rhs_asm, Some((rhs_op, rhs_type))) = self.rhs.compile(vars)? else {
+            todo!()
+        };
+        vars.end_scope();
+        let final_inst = match (&lhs_type, rhs_type) {
+            (CeriumType::U16, CeriumType::U16) => Instruction::Sub(lhs_op.clone(), rhs_op),
+            (CeriumType::I16, CeriumType::I16) => Instruction::Sub(lhs_op.clone(), rhs_op),
+            (CeriumType::F16, CeriumType::F16) => Instruction::Fsub(lhs_op.clone(), rhs_op),
+            (CeriumType::Pointer(_), CeriumType::U16) => Instruction::Sub(lhs_op.clone(), rhs_op),
+            _ => todo!("error")
+        };
+        result_asm.extend(rhs_asm);
+        result_asm.push(final_inst);
+        Ok((result_asm, Some((lhs_op, lhs_type))))
+
+    }
+}
+
+impl Deref {
+    pub fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
+        self.compile_mut(vars)
+    }
+}
+
 impl Iter {
-    pub(crate) fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
+    pub fn compile(self, vars: &mut Vars) -> Result<(Vec<Instruction>, Option<(Operand, CeriumType)>), CompilerError> {
         let (mut asm, Some((op, outer_type))) = self.inner.compile(vars)? else {
             todo!("error")
         };

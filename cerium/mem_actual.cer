@@ -7,8 +7,8 @@ fn mem::copy(dst: &any, src: &any, len: u16) {
 fn mem::alloc(size: u16) -> &any {
      let result = *mem::HEAP - size - 2;
      *mem::HEAP = result;
-     ^result = false;
-     ^result = size;
+     ^result = false alias any;
+     ^result = size alias any;
      result
 }
 
@@ -17,9 +17,9 @@ fn mem::size(ptr: &any) -> u16 {
 }
 
 fn mem::free(ptr: &any) {
-    *(ptr - 2) = true;
+    *(ptr - 2) = true alias any;
     while **mem::HEAP alias bool {
-        *mem::HEAP += *(*mem::HEAP + 1) alias u16 + 2;
+        *mem::HEAP = *mem::HEAP + *(*mem::HEAP + 1) alias u16 + 2;
     }
 }
 

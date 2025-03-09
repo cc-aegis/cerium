@@ -86,7 +86,7 @@ impl Vars<'_> {
 
     pub fn end_scope(&mut self) {
         if let Some(len) = self.scopes.pop() {
-            self.scopes.truncate(len);
+            self.vars.truncate(len);
         }
     }
 }

@@ -116,7 +116,39 @@ impl Assignment {
                 result.push(Instruction::Writeitr(lhs_op, rhs_op));
                 vars.end_scope();
                 Ok(result)
-            }
+            },box Expression::Deref(range, iter) => {
+                let ranges = (iter.inner.range(), self.value.range());
+                vars.begin_scope();
+                let (lhs_asm, Some((lhs_op, lhs_type))) = iter.inner.compile(vars)? else {
+                    return Err(CompilerError::InvalidDerefError(InvalidDerefError {
+                        range,
+                        found: None,
+                    }));
+                };
+                let CeriumType::Pointer(box inner_type) = lhs_type else {
+                    return Err(CompilerError::InvalidDerefError(InvalidDerefError {
+                        range,
+                        found: Some(lhs_type),
+                    }));
+                };
+                let value_range = self.value.range();
+                let (rhs_asm, Some((rhs_op, rhs_type))) = self.value.compile(vars)? else {
+                    todo!("unit assign error")
+                };
+                if inner_type != rhs_type {
+                    return Err(CompilerError::MismatchedAssignTypeError(MismatchedAssignTypeError {
+                        dst_range: ranges.0,
+                        dst_type: Some(inner_type),
+                        src_range: ranges.1,
+                        src_type: Some(rhs_type),
+                    }))
+                }
+                let mut result = lhs_asm;
+                result.extend(rhs_asm);
+                result.push(Instruction::Write(lhs_op, rhs_op));
+                vars.end_scope();
+                Ok(result)
+            },
             _ => todo!("error or generate code")
         }
     }

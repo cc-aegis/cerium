@@ -2,7 +2,7 @@ use crate::compiler::assembly::{Instruction, Operand, Register};
 use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError};
 use crate::compiler::vars::Vars;
 use crate::error::CompilerError;
-use crate::parser::ast::{Addition, Assignment, Deref, Expression, For, Inversion, Scope, Subtraction, TypeAlias};
+use crate::parser::ast::{Addition, Assignment, Deref, Expression, For, Inversion, Scope, Subtraction, TypeAlias, While};
 use crate::parser::cerium_type::CeriumType;
 
 impl Expression {
@@ -54,7 +54,7 @@ impl Expression {
             Expression::Let(_, _) => todo!(),
             Expression::If(_, _) => todo!(),
             Expression::For(_, for_loop) => for_loop.compile_into(vars, target),
-            Expression::While(_, _) => todo!(),
+            Expression::While(_, while_loop) => while_loop.compile_into(vars, target),
             Expression::Loop(_, _) => todo!(),
         }
     }
@@ -251,5 +251,31 @@ impl For {
             full_body,
             None
         ))
+    }
+}
+
+impl While {
+    fn compile_into(self, vars: &mut Vars, target: Operand) -> Result<(Vec<Instruction>, Option<CeriumType>), CompilerError> {
+        // jmp .cond; .loop:; <body>; .cond:; <cond->$0>; jrnz $0 .loop
+        vars.begin_scope();
+        let (cond_asm, Some((cond_op, CeriumType::Bool))) = self.condition.compile(vars)? else {
+            todo!("error: expected bool")
+        };
+        vars.end_scope();
+        vars.begin_scope();
+        let body_asm = self.body.compile_unit(vars)?;
+        vars.end_scope();
+
+        let l_cond = vars.label();
+        let o_cond = Operand::Direct(Register::RN(l_cond.clone()));
+        let l_loop = vars.label();
+        let o_loop = Operand::Direct(Register::RN(l_loop.clone()));
+
+        let mut result = vec![Instruction::Jmp(o_cond), Instruction::Label(l_loop)];
+        result.extend(body_asm);
+        result.push(Instruction::Label(l_cond));
+        result.extend(cond_asm);
+        result.push(Instruction::Jrnz(cond_op, o_loop));
+        Ok((result, None))
     }
 }
