@@ -1,9 +1,15 @@
 use std::fmt::{write, Display, Formatter};
 
 #[derive(Debug)]
+pub enum Annotation {
+    NonNegativeStackOffset(isize),
+}
+
+#[derive(Debug)]
 pub enum Instruction {
     Label(String),
     Define(String, Operand),
+    Annotation(Annotation),
     Dw(Vec<Operand>),
     Mov(Operand, Operand),
     Add(Operand, Operand),
@@ -17,6 +23,8 @@ pub enum Instruction {
     Writeitr(Operand, Operand),
     Write(Operand, Operand),
     Read(Operand, Operand),
+    Push(Operand),
+    Pop(Operand),
     Ret,
 }
 
@@ -37,6 +45,7 @@ impl Display for Instruction {
         match self {
             Instruction::Label(label) => write!(f, "{label}:"),
             Instruction::Define(name, op) => write!(f, "#define {name} {op}"),
+            Instruction::Annotation(annotation) => write!(f, "#annotation: {:?}", annotation),
             Instruction::Dw(operands) => {
                 write!(f, "    dw")?;
                 for operand in operands {
@@ -56,6 +65,8 @@ impl Display for Instruction {
             Instruction::Writeitr(cond, label) => write!(f, "    writeitr {cond} {label}"),
             Instruction::Write(cond, label) => write!(f, "    write {cond} {label}"),
             Instruction::Read(cond, label) => write!(f, "    read {cond} {label}"),
+            Instruction::Push(operand) => write!(f, "    push {operand}"),
+            Instruction::Pop(operand) => write!(f, "    pop {operand}"),
             Instruction::Ret => write!(f, "    ret"),
         }
     }

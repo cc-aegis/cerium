@@ -47,7 +47,10 @@ impl Function {
         };
         let mut vars = Vars::new(globals, self.parameters);
         let (mut body, return_type) = self.body.compile_into(&mut vars, Operand::Direct(Register::R0))?;
+        let (prefix, suffix) = vars.collect_affixes();
+        result.extend(prefix);
         result.append(&mut body);
+        result.extend(suffix);
         result.push(Instruction::Ret);
         if self.return_type == return_type {
             Ok(result)

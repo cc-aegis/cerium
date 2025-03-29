@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::ops::Sub;
-use crate::compiler::assembly::{Operand, Register};
+use crate::compiler::assembly::{Annotation, Instruction, Operand, Register};
 use crate::parser::ast::Qualifier;
 use crate::parser::cerium_type::CeriumType;
 
@@ -46,6 +46,7 @@ impl Vars<'_> {
     }
     pub fn push(&mut self, name: Option<Qualifier>, var_type: CeriumType) -> Operand {
         self.vars.push((name, var_type));
+        dbg!(self.vars.len());
         self.max_size = self.max_size.max(self.vars.len());
         var_op(self.vars.len() - 1)
     }
@@ -88,5 +89,44 @@ impl Vars<'_> {
         if let Some(len) = self.scopes.pop() {
             self.vars.truncate(len);
         }
+    }
+    
+    pub fn collect_affixes(&mut self) -> (Vec<Instruction>, Vec<Instruction>) {
+        // collecting push $0 push $1 into pusht $0 $1 will be done by post-optimizer
+        // ..push; add rb <offset>; ..; sub rb <offset>; ..pop
+        
+        //TODO: problem: push to store overlaps with push for args -> ??? add to bp to adjust??? ????
+        let mut push: Vec<_> = (0..=6)
+            .filter(|idx| *idx < self.max_size)
+            .map(|idx| Instruction::Push(var_op(idx)))
+            .collect();
+        if self.max_size > 7 {
+            push.push(Instruction::Add(
+                Operand::Direct(Register::RS),
+                Operand::Direct(Register::RN(self.max_size.sub(7).to_string())),
+            ));
+        }
+        if self.max_size > 0 {
+            push.push(Instruction::Annotation(Annotation::NonNegativeStackOffset(
+                self.max_size.min(7) as isize
+            )))
+        }
+        let mut pop = Vec::new();
+        if self.max_size > 0 {
+            pop.push(Instruction::Annotation(Annotation::NonNegativeStackOffset(
+                -(self.max_size.min(7) as isize)
+            )))
+        }
+        if self.max_size > 7 {
+            pop.push(Instruction::Sub(
+                Operand::Direct(Register::RS),
+                Operand::Direct(Register::RN(self.max_size.sub(7).to_string())),
+            ));
+        }
+        pop.extend((0..=6)
+            .filter(|idx| *idx < self.max_size)
+            .map(|idx| Instruction::Pop(var_op(idx))));
+
+        (push, pop)
     }
 }
