@@ -70,7 +70,6 @@ impl<'a> Lexer<'a> {
             "loop" => Token::Loop,
             "break" => Token::Break,
             "continue" => Token::Continue,
-            "iter" => Token::Iter,
             "step" => Token::Step,
             "let" => Token::Let,
             "if" => Token::If,

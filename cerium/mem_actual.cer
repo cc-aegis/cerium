@@ -1,5 +1,5 @@
 fn mem::copy(dst: &any, src: &any, len: u16) {
-    for len downto 0 {
+    for iter downto 0 {
         ^dst = ^src;
     }
 }
