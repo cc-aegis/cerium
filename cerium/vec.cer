@@ -1,0 +1,43 @@
+struct Vec {
+    buf: &any,
+    len: u16,
+    cap: u16,
+}
+
+fn Vec::new() -> &Vec {
+    let vec = malloc(3) alias &Vec;
+    vec.buf = malloc(0);
+    vec.len = 0;
+    vec.cap = 0;
+}
+
+fn Vec::grow(vec: &Vec) {
+    let cap = vec.cap + (vec.cap >> 1) + 1;
+    let buf = mem::alloc(cap);
+    mem::copy(buf, vec.buf, vec.cap);
+    mem::free(vec.buf);
+    vec.buf = buf;
+    vec.cap = cap;
+}
+
+fn Vec::push(vec: &Vec, item: any) {
+    if vec.len == vec.cap {
+        // avoid allocating memory for unhappy path for every call
+        Vec::grow(vec);
+    }
+    vec.buf[vec.len] = item;
+    vec.len = vec.len + 1;
+}
+
+fn Vec::get(vec: &Vec, idx: u16) -> &any {
+    if idx < vec.len {
+        vec.buf + idx
+    } else {
+        nullptr
+    }
+}
+
+fn Vec::free(vec: &Vec) {
+    mem::free(vec.buf);
+    mem::free(vec);
+}
