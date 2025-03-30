@@ -9,8 +9,8 @@ use crate::lexer::error::SyntaxError;
 #[derive(Debug, Clone)]
 pub enum Token {
     Ident(String),
-    Integer(String),
-    Float(String),
+    Integer(usize),
+    Float(f32),
     String(String),
     Char(char),
     True, False, Nullptr,
@@ -20,7 +20,7 @@ pub enum Token {
     Plus, Minus, Asterisk, Slash, Ampersand, Pipe, Circumflex, Bang,
     LParen, RParen, LBracket, RBracket, LBrace, RBrace,
     Colon, Semicolon, Scope, Comma, Dot,
-    For, To, While, Loop, Break, Continue, Let, If, Else,
+    For, To, DownTo, In, While, Loop, Break, Continue, Let, If, Else,
     Iter, Step,
     Assign, Equals, NotEquals, LessThan, LessThanEquals, GreaterThan, GreaterThanEquals,
     And, Or,
@@ -64,6 +64,8 @@ impl<'a> Lexer<'a> {
             "bool" => Token::Bool,
             "for" => Token::For,
             "to" => Token::To,
+            "downto" => Token::DownTo,
+            "in" => Token::In,
             "while" => Token::While,
             "loop" => Token::Loop,
             "break" => Token::Break,
@@ -93,9 +95,9 @@ impl<'a> Lexer<'a> {
                 while let Some((_, c)) = self.chars.next_if(|(_, c)| c.is_ascii_digit()) {
                     result.push(c);
                 }
-                Token::Float(result)
+                Token::Float(result.parse().unwrap())
             }
-            _ => Token::Integer(result)
+            _ => Token::Integer(result.parse().unwrap()),
         })))
     }
 

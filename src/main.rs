@@ -3,17 +3,19 @@
 #![allow(unused)]
 extern crate core;
 
-use crate::compiler::compile;
+//use crate::compiler::compile;
 use crate::error::CompilerError;
+use crate::lexer::Lexer;
+use crate::parser::Parser;
 
 pub mod lexer;
 pub mod error;
 pub mod parser;
-mod compiler;
+//mod compiler;
 
 fn main() {
     let code = include_str!("../cerium/mem_actual.cer");
-    match compile(code) {
+    /*match compile(code) {
         Ok(asm) => {
             let asm = asm
                 .into_iter()
@@ -23,5 +25,6 @@ fn main() {
             println!("{asm}");
         },
         Err(err) => println!("{}", err.format(code)),
-    }
+    }*/
+    dbg!(Parser::new(Lexer::new(code)).parse());
 }

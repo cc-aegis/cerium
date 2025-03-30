@@ -2,7 +2,7 @@ use std::iter::Peekable;
 use std::ops::Range;
 use crate::error::CompilerError;
 use crate::lexer::{Lexer, Token};
-use crate::parser::ast::{Addition, ArrayAccess, Assignment, BitwiseAnd, BitwiseOr, BitwiseXor, Borrow, Const, Definition, Deref, Division, Equals, Expression, FieldAccess, For, Function, FunctionCall, GreaterThan, GreaterThanEquals, If, Inversion, Iter, LeftShift, LessThan, LessThanEquals, Let, LogicalAnd, LogicalOr, Loop, Multiplication, Negation, NotEquals, Program, Qualifier, RightShift, Scope, Struct, Subtraction, TypeAlias, While};
+use crate::parser::ast::*;
 use crate::parser::cerium_type::CeriumType;
 
 pub mod ast;
@@ -66,7 +66,7 @@ impl<'a> Parser<'a> {
 }
 
 impl Parser<'_> {
-    fn parse_qualifier(&mut self) -> Result<(Range<usize>, Qualifier), CompilerError> {
+    fn parse_qualifier(&mut self) -> Result<RangeAnnotation<Qualifier>, CompilerError> {
         let (start, mut end, mut result) = expect_token!(self.lexer, (Range { start, end }, Token::Ident(ident)), (start, end, vec![ident]));
         while self.lexer.next_if(|t| matches!(t, Ok((_, Token::Scope)))).is_some() {
             result.push(expect_token!(self.lexer, (range, Token::Ident(ident)), {
@@ -74,31 +74,31 @@ impl Parser<'_> {
                 ident
             }));
         }
-        Ok((start..end, Qualifier { names: result }))
+        Ok(RangeAnnotation::new(start..end, Qualifier::from(result)))
     }
 
-    fn parse_type(&mut self) -> Result<(Range<usize>, CeriumType), CompilerError> {
+    fn parse_type(&mut self) -> Result<RangeAnnotation<CeriumType>, CompilerError> {
         //fn(..type)->type fn(..type) &type [type] [type; N] i16 u16 f16 bool any S S<..type>
         match self.lexer.next().ok_or(CompilerError::MissingTokenError)?? {
-            (range, Token::I16) => Ok((range, CeriumType::I16)),
-            (range, Token::U16) => Ok((range, CeriumType::U16)),
-            (range, Token::F16) => Ok((range, CeriumType::F16)),
-            (range, Token::Bool) => Ok((range, CeriumType::Bool)),
-            (range, Token::Any) => Ok((range, CeriumType::Any)),
-            (range, Token::Ident(ident)) => Ok((range, CeriumType::Struct(ident, Vec::new()))),
+            (range, Token::I16) => Ok(RangeAnnotation::new(range, CeriumType::I16)),
+            (range, Token::U16) => Ok(RangeAnnotation::new(range, CeriumType::U16)),
+            (range, Token::F16) => Ok(RangeAnnotation::new(range, CeriumType::F16)),
+            (range, Token::Bool) => Ok(RangeAnnotation::new(range, CeriumType::Bool)),
+            (range, Token::Any) => Ok(RangeAnnotation::new(range, CeriumType::Any)),
+            (range, Token::Ident(ident)) => Ok(RangeAnnotation::new(range, CeriumType::Struct(ident, Vec::new()))),
             (Range { start, .. }, Token::Ampersand) => {
-                let (Range { end, .. }, inner_type) = self.parse_type()?;
-                Ok((start .. end, CeriumType::Pointer(Box::new(inner_type))))
+                let RangeAnnotation { range, inner: inner_type } = self.parse_type()?;
+                Ok(RangeAnnotation::new(start .. range.end, CeriumType::Pointer(Box::new(inner_type))))
             },
             (Range { start, .. }, Token::And) => {
-                let (Range { end, .. }, inner_type) = self.parse_type()?;
-                Ok((start .. end, CeriumType::Pointer(Box::new(CeriumType::Pointer(Box::new(inner_type))))))
+                let RangeAnnotation { range, inner: inner_type } = self.parse_type()?;
+                Ok(RangeAnnotation::new(start .. range.end, CeriumType::Pointer(Box::new(CeriumType::Pointer(Box::new(inner_type))))))
             },
             (Range { start, .. }, Token::Fn) => {
                 expect_token!(self.lexer, (_, Token::LParen), {});
                 let mut param_types = Vec::new();
                 while !matches!(self.lexer.peek(), Some(Ok((_, Token::RParen)))) {
-                    let param_type = self.parse_type()?.1;
+                    let param_type = self.parse_type()?.inner;
                     param_types.push(param_type);
                     if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {
                         break;
@@ -107,11 +107,11 @@ impl Parser<'_> {
                 let mut end = expect_token!(self.lexer, (Range { end, .. }, Token::RParen), end);
                 let return_type = if let Some(Ok((range, _))) = self.lexer.next_if(|t| matches!(t, Ok((_, Token::Arrow)))) {
                     end = range.end;
-                    Some(Box::new(self.parse_type()?.1))
+                    Some(Box::new(self.parse_type()?.inner))
                 } else {
                     None
                 };
-                Ok((start .. end, CeriumType::Function(param_types, return_type)))
+                Ok(RangeAnnotation::new(start .. end, CeriumType::Function(param_types, return_type)))
 
             },
             (range, found) => Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError {
@@ -123,14 +123,13 @@ impl Parser<'_> {
 
     fn parse_function(&mut self) -> Result<Definition, CompilerError> {
         expect_token!(self.lexer, (_, Token::Fn), {});
-        let name = self.parse_qualifier()?.1;
+        let name = self.parse_qualifier()?;
         expect_token!(self.lexer, (_, Token::LParen), {});
         let mut parameters = Vec::new();
         while !matches!(self.lexer.peek(), Some(Ok((_, Token::RParen)))) {
-            let param_name = expect_token!(self.lexer, (_, Token::Ident(ident)), ident);
-            let param_name = Qualifier { names: vec![param_name] };
+            let param_name = expect_token!(self.lexer, (range, Token::Ident(ident)), RangeAnnotation::new(range, Qualifier::from_str(ident)));
             expect_token!(self.lexer, (_, Token::Colon), {});
-            let param_type = self.parse_type()?.1;
+            let param_type = self.parse_type()?;
             parameters.push((param_name, param_type));
             if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {
                 break;
@@ -138,10 +137,10 @@ impl Parser<'_> {
         }
         expect_token!(self.lexer, (_, Token::RParen), {});
         let return_type = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Arrow)))) {
-            Some(_) => Some(self.parse_type()?.1),
+            Some(_) => Some(self.parse_type()?),
             None => None,
         };
-        let body = Box::new(self.parse_scope()?);
+        let body = self.parse_scope()?;
         Ok(Definition::Function(Function {
             name,
             parameters,
@@ -152,9 +151,9 @@ impl Parser<'_> {
 
     fn parse_const(&mut self) -> Result<Definition, CompilerError> {
         expect_token!(self.lexer, (_, Token::Const), {});
-        let name = self.parse_qualifier()?.1;
+        let name = self.parse_qualifier()?;
         expect_token!(self.lexer, (_, Token::Colon), {});
-        let const_type = self.parse_type()?.1;
+        let const_type = self.parse_type()?;
         expect_token!(self.lexer, (_, Token::Assign), {});
         let value = self.parse_expression()?;
         expect_token!(self.lexer, (_, Token::Semicolon), {});
@@ -167,7 +166,7 @@ impl Parser<'_> {
 
     fn parse_struct(&mut self) -> Result<Definition, CompilerError> {
         expect_token!(self.lexer, (_, Token::Struct), {});
-        let name = self.parse_qualifier()?.1;
+        let name = self.parse_qualifier()?;
         let mut attributes = Vec::new();
         expect_token!(self.lexer, (_, Token::LBrace), {});
         loop {
@@ -175,9 +174,9 @@ impl Parser<'_> {
                 break;
             }
 
-            let name = expect_token!(self.lexer, (range, Token::Ident(ident)), ident);
+            let name = expect_token!(self.lexer, (range, Token::Ident(ident)), RangeAnnotation::new(range, Qualifier::from_str(ident)));
             expect_token!(self.lexer, (_, Token::Colon), {});
-            let param_type = self.parse_type()?.1;
+            let param_type = self.parse_type()?;
             attributes.push((name, param_type));
 
             if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Comma)))).is_none() {
@@ -229,179 +228,212 @@ value   [LParen Expression RParen] | [Value LBracket Expression RBracket] | [Val
 *thing.field[3] = 4
  */
 
+macro_rules! next_matches {
+    ($iter:expr, $pattern:pat) => {
+        $iter
+            .next_if(|t| matches!(t, $pattern))
+            .is_some()
+    };
+}
+
 //TODO: design macros for repeatedly used logic
 impl Parser<'_> {
-    fn parse_expression(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_expression(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         // = ||&& <><=>=!=== &|^<<>> +- */ aliasas !&*
-        let lhs = self.parse_logical_operation()?;
+        let target = self.parse_logical_operation()?;
 
-        if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Assign)))).is_some() {
-            let rhs = self.parse_expression()?;
-            let range = lhs.range().start..rhs.range().end;
-            Ok(Expression::Assignment(range, Assignment { target: Box::new(lhs), value: Box::new(rhs) }))
+        if next_matches!(self.lexer, Ok((_, Token::Assign))) {
+            let value = self.parse_expression()?;
+            let range = target.range.start .. value.range.end;
+            let expression = Expression::Assignment(Box::new(Assignment { target, value }));
+            Ok(RangeAnnotation::new(range, expression))
         } else {
-            Ok(lhs)
+            Ok(target)
         }
     }
-    fn parse_logical_operation(&mut self) -> Result<Expression, CompilerError> {
-        let mut result = self.parse_compare_operation()?;
+    fn parse_logical_operation(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        let mut lhs = self.parse_compare_operation()?;
         loop {
-            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::And)))).is_some() {
+            if next_matches!(self.lexer, Ok((_, Token::And))) {
+                //TODO: macro that replaces lhs with stuff like below
                 let rhs = self.parse_compare_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::LogicalAnd(range, LogicalAnd { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Or)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::LogicalAnd(Box::new(LogicalAnd { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::Or))) {
                 let rhs = self.parse_compare_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::LogicalOr(range, LogicalOr { lhs: Box::new(result), rhs: Box::new(rhs) });
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::LogicalOr(Box::new(LogicalOr { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
             } else {
-                break Ok(result);
+                break Ok(lhs);
             }
         }
     }
 
-    fn parse_compare_operation(&mut self) -> Result<Expression, CompilerError> {
-        let mut result = self.parse_bitwise_operation()?;
+    fn parse_compare_operation(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        let mut lhs = self.parse_bitwise_operation()?;
         loop {
-            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LessThan)))).is_some() {
+            if next_matches!(self.lexer, Ok((_, Token::LessThan))) {
                 let rhs = self.parse_bitwise_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::LessThan(range, LessThan { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LessThanEquals)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::LessThan(Box::new(LessThan { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::LessThanEquals))) {
                 let rhs = self.parse_bitwise_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::LessThanEquals(range, LessThanEquals { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::GreaterThan)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::LessThanEquals(Box::new(LessThanEquals { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::GreaterThan))) {
                 let rhs = self.parse_bitwise_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::GreaterThan(range, GreaterThan { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::GreaterThanEquals)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::GreaterThan(Box::new(GreaterThan { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::GreaterThanEquals))) {
                 let rhs = self.parse_bitwise_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::GreaterThanEquals(range, GreaterThanEquals { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Equals)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::GreaterThanEquals(Box::new(GreaterThanEquals { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::Equals))) {
                 let rhs = self.parse_bitwise_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::Equals(range, Equals { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::NotEquals)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::Equals(Box::new(Equals { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::NotEquals))) {
                 let rhs = self.parse_bitwise_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::NotEquals(range, NotEquals { lhs: Box::new(result), rhs: Box::new(rhs) });
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::NotEquals(Box::new(NotEquals { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
             } else {
-                break Ok(result);
+                break Ok(lhs);
             }
         }
     }
 
-    fn parse_bitwise_operation(&mut self) -> Result<Expression, CompilerError> {
-        let mut result = self.parse_dash_operation()?;
+    fn parse_bitwise_operation(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        let mut lhs = self.parse_dash_operation()?;
         loop {
-            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Ampersand)))).is_some() {
+            if next_matches!(self.lexer, Ok((_, Token::Ampersand))) {
                 let rhs = self.parse_dash_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::BitwiseOr(range, BitwiseOr { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Circumflex)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::BitwiseOr(Box::new(BitwiseOr { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::Circumflex))) {
                 let rhs = self.parse_dash_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::BitwiseXor(range, BitwiseXor { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Pipe)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::BitwiseXor(Box::new(BitwiseXor { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::Pipe))) {
                 let rhs = self.parse_dash_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::BitwiseAnd(range, BitwiseAnd { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LShift)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::BitwiseAnd(Box::new(BitwiseAnd { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::LShift))) {
                 let rhs = self.parse_dash_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::LeftShift(range, LeftShift { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::RShift)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::LeftShift(Box::new(LeftShift { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::RShift))) {
                 let rhs = self.parse_dash_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::RightShift(range, RightShift { lhs: Box::new(result), rhs: Box::new(rhs) });
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::RightShift(Box::new(RightShift { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
             } else {
-                break Ok(result);
+                break Ok(lhs);
             }
         }
     }
 
-    fn parse_dash_operation(&mut self) -> Result<Expression, CompilerError> {
-        let mut result = self.parse_point_operation()?;
+    fn parse_dash_operation(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        let mut lhs = self.parse_point_operation()?;
         loop {
-            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Plus)))).is_some() {
+            if next_matches!(self.lexer, Ok((_, Token::Plus))) {
                 let rhs = self.parse_point_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::Addition(range, Addition { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Minus)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::Addition(Box::new(Addition { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::Minus))) {
                 let rhs = self.parse_point_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::Subtraction(range, Subtraction { lhs: Box::new(result), rhs: Box::new(rhs) });
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::Subtraction(Box::new(Subtraction { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
             } else {
-                break Ok(result);
+                break Ok(lhs);
             }
         }
     }
 
-    fn parse_point_operation(&mut self) -> Result<Expression, CompilerError> {
-        let mut result = self.parse_typing_operation()?;
+    fn parse_point_operation(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        let mut lhs = self.parse_typing_operation()?;
         loop {
-            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Asterisk)))).is_some() {
+            if next_matches!(self.lexer, Ok((_, Token::Asterisk))) {
                 let rhs = self.parse_typing_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::Multiplication(range, Multiplication { lhs: Box::new(result), rhs: Box::new(rhs) });
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Slash)))).is_some() {
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::Multiplication(Box::new(Multiplication { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
+            } else if next_matches!(self.lexer, Ok((_, Token::Slash))) {
                 let rhs = self.parse_typing_operation()?;
-                let range = result.range().start .. rhs.range().end;
-                result = Expression::Division(range, Division { lhs: Box::new(result), rhs: Box::new(rhs) });
+                let range = lhs.range.start .. rhs.range.end;
+                let expression = Expression::Division(Box::new(Division { lhs, rhs }));
+                lhs = RangeAnnotation::new(range, expression);
             } else {
-                break Ok(result);
+                break Ok(lhs);
             }
         }
     }
 
-    fn parse_typing_operation(&mut self) -> Result<Expression, CompilerError> {
-        let mut result = self.parse_prefix_operation()?;
+    fn parse_typing_operation(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        let mut value = self.parse_prefix_operation()?;
         loop {
-            if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Alias)))).is_some() {
-                let (range, target_type) = self.parse_type()?;
-                //let range = result.range().start .. rhs.range().end;
-                result = Expression::TypeAlias(range, TypeAlias {
-                    value: Box::new(result),
-                    target_type: Box::new(target_type),
-                })
-            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::As)))).is_some() {
+            if next_matches!(self.lexer, Ok((_, Token::Alias))) {
                 let target_type = self.parse_type()?;
-                //let range = result.range().start .. rhs.range().end;
+                let range = value.range.start .. target_type.range.end;
+                let expression = Expression::TypeAlias(Box::new(TypeAlias { value, target_type}));
+                value = RangeAnnotation::new(range, expression);
+            } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::As)))).is_some() {
                 todo!()
             } else {
-                break Ok(result);
+                break Ok(value);
             }
         }
     }
 
-    fn parse_prefix_operation(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_prefix_operation(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         match self.lexer.peek().ok_or(CompilerError::MissingTokenError)? {
             Ok((_, Token::Ampersand)) => {
                 let range = self.lexer.next().unwrap().unwrap().0;
-                let inner = Box::new(self.parse_prefix_operation()?);
-                Ok(Expression::Borrow(range.start..inner.range().end, Borrow { inner }))
+                let inner = self.parse_prefix_operation()?;
+                let range = range.start..inner.range.end;
+                let expression = Expression::Borrow(Box::new(Borrow { inner }));
+                Ok(RangeAnnotation::new(range, expression))
             },
             Ok((_, Token::Bang)) => {
                 let range = self.lexer.next().unwrap().unwrap().0;
-                let inner = Box::new(self.parse_prefix_operation()?);
-                Ok(Expression::Negation(range.start..inner.range().end, Negation { inner }))
+                let inner = self.parse_prefix_operation()?;
+                let range = range.start..inner.range.end;
+                let expression = Expression::Negation(Box::new(Negation { inner }));
+                Ok(RangeAnnotation::new(range, expression))
             },
             Ok((_, Token::Asterisk)) => {
                 let range = self.lexer.next().unwrap().unwrap().0;
-                let inner = Box::new(self.parse_prefix_operation()?);
-                Ok(Expression::Deref(range.start..inner.range().end, Deref { inner }))
+                let inner = self.parse_prefix_operation()?;
+                let range = range.start..inner.range.end;
+                let expression = Expression::Deref(Box::new(Deref { inner }));
+                Ok(RangeAnnotation::new(range, expression))
             },
             Ok((_, Token::Circumflex)) => {
                 let range = self.lexer.next().unwrap().unwrap().0;
-                let inner = Box::new(self.parse_prefix_operation()?);
-                Ok(Expression::Iter(range.start..inner.range().end, Iter { inner }))
+                let inner = self.parse_prefix_operation()?;
+                let range = range.start..inner.range.end;
+                let expression = Expression::Iter(Box::new(Iter { inner }));
+                Ok(RangeAnnotation::new(range, expression))
             },
             Ok((_, Token::Minus)) => {
                 let range = self.lexer.next().unwrap().unwrap().0;
-                let inner = Box::new(self.parse_prefix_operation()?);
-                Ok(Expression::Inversion(range.start..inner.range().end, Inversion { inner }))
+                let inner = self.parse_prefix_operation()?;
+                let range = range.start..inner.range.end;
+                let expression = Expression::Inversion(Box::new(Inversion { inner }));
+                Ok(RangeAnnotation::new(range, expression))
             },
             Ok(_) => self.parse_value(),
             Err(err) => Err(err.clone()),
@@ -410,85 +442,109 @@ impl Parser<'_> {
 }
 
 impl Parser<'_> {
-    fn parse_parens(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_parens(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         expect_token!(self.lexer, (_, Token::LParen), {});
         let result = self.parse_expression();
         expect_token!(self.lexer, (_, Token::RParen), {});
         result
     }
 
-    fn parse_let(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_let(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         let start = expect_token!(self.lexer, (Range { start, .. }, Token::Let), start);
-        let name = expect_token!(self.lexer, (_, Token::Ident(i)), i);
+        let name = expect_token!(self.lexer, (range, Token::Ident(name)), RangeAnnotation::new(range, Qualifier::from_str(name)));
         expect_token!(self.lexer, (_, Token::Assign), {});
         let value = self.parse_expression()?;
-        Ok(Expression::Let(start .. value.range().end, Let {
-            name: Qualifier { names: vec![name] },
-            value: Box::new(value),
-        }))
+        if next_matches!(self.lexer, Ok((_, Token::In))) {
+            let body = self.parse_expression()?;
+            let range = start..body.range.end;
+            Ok(RangeAnnotation::new(range, Expression::LetIn(Box::new(LetIn {
+                name,
+                value,
+                body,
+            }))))
+        } else {
+            let range = start..value.range.end;
+            Ok(RangeAnnotation::new(range, Expression::Let(Box::new(Let {
+                name,
+                value,
+            }))))
+        }
     }
 
-    fn parse_if(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_if(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         let start = expect_token!(self.lexer, (Range { start, .. }, Token::If), start);
         let condition = self.parse_expression()?;
         let if_branch = self.parse_scope()?;
         let (end, else_branch) = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Else)))) {
             Some(_) => {
                 let else_branch = self.parse_scope()?;
-                (else_branch.range().end, Some(Box::new(else_branch)))
+                (else_branch.range.end, Some(else_branch))
             },
-            None => (if_branch.range().end, None),
+            None => (if_branch.range.end, None),
         };
-        Ok(Expression::If(start .. end, If {
-            condition: Box::new((condition)),
-            if_branch: Box::new((if_branch)),
+        Ok(RangeAnnotation::new(start .. end, Expression::If(Box::new(If {
+            condition,
+            if_branch,
             else_branch,
-        }))
+        }))))
     }
 
-    fn parse_for(&mut self) -> Result<Expression, CompilerError> {
-        //for <qualifier> (= <expr>) (to <expr>) (step <const>)
+    fn parse_for(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        //for <qualifier> [in | to | downto] <expr> <scope>
         let start = expect_token!(self.lexer, (Range { start, .. }, Token::For), start);
-        let counter = self.parse_qualifier()?.1;
-        let initialization = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Assign)))) {
-            Some(_) => Some(Box::new(self.parse_expression()?)),
-            None => None,
-        };
-        let limit = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::To)))) {
-            Some(_) => Some(Box::new(self.parse_expression()?)),
-            None => None,
-        };
-        let step = match self.lexer.next_if(|t| matches!(t, Ok((_, Token::Step)))) {
-            Some(_) => Some(Box::new(self.parse_expression()?)),
-            None => None,
-        };
-        let body = self.parse_expression()?;
-        Ok(Expression::For(start..body.range().end, For {
-            counter,
-            initialization,
-            limit,
-            step,
-            body: Box::new(body),
-        }))
+        let var = self.parse_qualifier()?;
+        match self.lexer.next().ok_or(CompilerError::MissingTokenError)?? {
+            (_, Token::To) => {
+                let limit = self.parse_expression()?;
+                let body = self.parse_scope()?;
+                Ok(RangeAnnotation::new(start..body.range.end, Expression::ForTo(Box::new(ForTo {
+                    var,
+                    limit,
+                    body,
+                }))))
+            },
+            (_, Token::DownTo) => {
+                let limit = self.parse_expression()?;
+                let body = self.parse_scope()?;
+                Ok(RangeAnnotation::new(start..body.range.end, Expression::ForDownTo(Box::new(ForDownTo {
+                    var,
+                    limit,
+                    body,
+                }))))
+            },
+            (_, Token::In) => {
+                let iterator = self.parse_expression()?;
+                let body = self.parse_scope()?;
+                Ok(RangeAnnotation::new(start..body.range.end, Expression::ForIn(Box::new(ForIn {
+                    var,
+                    iterator,
+                    body,
+                }))))
+            },
+            (range, token) => Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError {
+                range,
+                found: token,
+            }))
+        }
     }
 
-    fn parse_while(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_while(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         let start = expect_token!(self.lexer, (Range { start, .. }, Token::While), start);
         let condition = self.parse_expression()?;
         let body = self.parse_scope()?;
-        Ok(Expression::While(start .. body.range().end, While {
-            condition: Box::new(condition),
-            body: Box::new(body),
-        }))
+        Ok(RangeAnnotation::new(start .. body.range.end, Expression::While(Box::new(While {
+            condition,
+            body,
+        }))))
     }
 
-    fn parse_loop(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_loop(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         let start = expect_token!(self.lexer, (Range { start, .. }, Token::Loop), start);
         let body = self.parse_scope()?;
-        Ok(Expression::Loop(start .. body.range().end, Loop { body: Box::new(body) }))
+        Ok(RangeAnnotation::new(start .. body.range.end, Expression::Loop(Box::new(Loop { body }))))
     }
 
-    fn parse_value(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_value(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         let mut result = match self.lexer.peek().ok_or(CompilerError::MissingTokenError)? {
             Ok((_, Token::LBrace)) => self.parse_scope(),
             Ok((_, Token::LParen)) => self.parse_parens(),
@@ -505,18 +561,18 @@ impl Parser<'_> {
 
         loop {
             if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Dot)))).is_some() {
-                let (end, field) = expect_token!(self.lexer, (range, Token::Ident(ident)), (range.end, ident));
-                result = Expression::FieldAccess(result.range().start .. end, FieldAccess {
-                    base: Box::new(result),
+                let field = expect_token!(self.lexer, (range, Token::Ident(name)), RangeAnnotation::new(range, Qualifier::from_str(name)));
+                result = RangeAnnotation::new(result.range.start .. field.range.end, Expression::FieldAccess(Box::new(FieldAccess {
+                    base: result,
                     field,
-                });
+                })));
             } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LBracket)))).is_some() {
                 let index = self.parse_expression()?;
                 let end = expect_token!(self.lexer, (Range { end, .. }, Token::RBracket), end);
-                result = Expression::ArrayAccess(result.range().start..end, ArrayAccess {
-                    base: Box::new(result),
-                    index: Box::new(index),
-                });
+                result = RangeAnnotation::new(result.range.start..end, Expression::ArrayAccess(Box::new(ArrayAccess {
+                    base: result,
+                    index,
+                })));
             } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::LParen)))).is_some() {
                 let mut params = Vec::new();
                 loop {
@@ -531,23 +587,26 @@ impl Parser<'_> {
                     }
                 }
                 let end = expect_token!(self.lexer, (Range { end, .. }, Token::RParen), end);
-                result = Expression::FunctionCall(result.range().start..end, FunctionCall {
-                    func: Box::new(result),
+                result = RangeAnnotation::new(result.range.start..end, Expression::FunctionCall(Box::new(FunctionCall {
+                    func: result,
                     params,
-                });
+                })));
             } else {
                 break Ok(result);
             }
         }
     }
 
-    fn parse_constant(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_constant(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        //TODO: + for signed positive
         match self.lexer.next().ok_or(CompilerError::MissingTokenError)?? {
-            (range, Token::Integer(i)) => Ok(Expression::Integer(range, i)),
-            (range, Token::Float(f)) => Ok(Expression::Float(range, f)),
-            (range, Token::True) => Ok(Expression::Boolean(range, true)),
-            (range, Token::False) => Ok(Expression::Boolean(range, false)),
-            (range, Token::Nullptr) => Ok(Expression::Nullptr(range)),
+            (range, Token::Plus) => todo!(),
+            //TODO: minus?
+            (range, Token::Integer(i)) => Ok(RangeAnnotation::new(range, Expression::UnsignedInteger(i as u16))),
+            (range, Token::Float(f)) => Ok(RangeAnnotation::new(range, Expression::Float(f))),
+            (range, Token::True) => Ok(RangeAnnotation::new(range, Expression::Boolean(true))),
+            (range, Token::False) => Ok(RangeAnnotation::new(range, Expression::Boolean(false))),
+            (range, Token::Nullptr) => Ok(RangeAnnotation::new(range, Expression::Nullptr)),
             (range, token) => Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError {
                 range,
                 found: token,
@@ -555,14 +614,12 @@ impl Parser<'_> {
         }
     }
 
-    fn parse_variable(&mut self) -> Result<Expression, CompilerError> {
-        // let (range, name) = expect_token!(self.lexer, (range, Token::Ident(ident)), (range, ident));
-        // Ok(Expression::Variable(range, name))
-        let (range, qualifier) = self.parse_qualifier()?;
-        Ok(Expression::Variable(range, qualifier))
+    fn parse_variable(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        let RangeAnnotation { range, inner: qualifier } = self.parse_qualifier()?;
+        Ok(RangeAnnotation::new(range, Expression::Variable(qualifier)))
     }
 
-    fn parse_scope(&mut self) -> Result<Expression, CompilerError> {
+    fn parse_scope(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         let start = expect_token!(self.lexer, (range, Token::LBrace), { range.start });
         let mut instructions = Vec::new();
         let value = loop {
@@ -573,15 +630,15 @@ impl Parser<'_> {
             instructions.push(self.parse_expression()?);
 
             if self.lexer.next_if(|t| matches!(t, Ok((_, Token::Semicolon)))).is_none() {
-                break Some(Box::new(instructions.pop().unwrap()));
+                break Some(instructions.pop().unwrap());
             }
         };
 
         let end = expect_token!(self.lexer, (range, Token::RBrace), { range.end });
 
-        Ok(Expression::Scope(start..end, Scope {
+        Ok(RangeAnnotation::new(start..end, Expression::Scope(Box::new(Scope {
             instructions,
             value,
-        }))
+        }))))
     }
 }

@@ -1,6 +1,6 @@
 use std::ops::{Add, Range};
 use colored::{Color, Colorize};
-use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError, MismatchedReturnTypeError};
+//use crate::compiler::error::{InvalidDerefError, MismatchedAssignTypeError, MismatchedReturnTypeError};
 use crate::lexer::error::SyntaxError;
 use crate::parser::ast::Qualifier;
 use crate::parser::cerium_type::{format_type, CeriumType};
@@ -11,9 +11,9 @@ pub enum CompilerError {
     SyntaxError(SyntaxError),
     UnexpectedTokenError(UnexpectedTokenError),
     MissingTokenError,
-    MismatchedReturnTypeError(MismatchedReturnTypeError),
-    MismatchedAssignTypeError(MismatchedAssignTypeError),
-    InvalidDerefError(InvalidDerefError),
+    //MismatchedReturnTypeError(MismatchedReturnTypeError),
+    //MismatchedAssignTypeError(MismatchedAssignTypeError),
+    //InvalidDerefError(InvalidDerefError),
 }
 
 fn str_lines_within_range(src: &str, range: Range<usize>) -> Vec<(usize, Range<usize>, &str)> {
@@ -78,7 +78,7 @@ impl CompilerError {
                     ": unexpected ending".color(Color::BrightWhite),
                 )
             },
-            CompilerError::MismatchedReturnTypeError(MismatchedReturnTypeError { function_name, expected, actual, range }) => {
+            /*CompilerError::MismatchedReturnTypeError(MismatchedReturnTypeError { function_name, expected, actual, range }) => {
                 let lines = str_lines_within_range(src, range.clone());
                 let underlined = format_underline(lines);
                 format!(
@@ -115,7 +115,7 @@ impl CompilerError {
                         format_type(found),
                     ).color(Color::BrightWhite),
                 )
-            }
+            }*/
         }
     }
 }

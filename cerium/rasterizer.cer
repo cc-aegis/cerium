@@ -1,0 +1,78 @@
+struct Vertex {
+    x: f16,
+    y: f16,
+    z: f16,
+}
+
+struct Triangle {
+    first: u16,
+    second: u16,
+    third: u16,
+}
+
+struct Model {
+    vert_count: u16,
+    verts: &Vertex,
+    tri_count: u16,
+    tris: &Triangle
+}
+
+const UNIT_CUBE: &Model = &Model {
+    vert_count: 8,
+    verts: &[
+        Vertex { x: -1.0, y: -1.0, z: -1.0 },
+        Vertex { x: -1.0, y: -1.0, z:  1.0 },
+        Vertex { x: -1.0, y:  1.0, z: -1.0 },
+        Vertex { x: -1.0, y:  1.0, z:  1.0 },
+        Vertex { x:  1.0, y: -1.0, z: -1.0 },
+        Vertex { x:  1.0, y: -1.0, z:  1.0 },
+        Vertex { x:  1.0, y:  1.0, z: -1.0 },
+        Vertex { x:  1.0, y:  1.0, z:  1.0 },
+    ],
+    tri_count: 12,
+    tris: &[
+        Triangle { first: 0, second: 1, third: 2 },
+        Triangle { first: 1, second: 2, third: 3 },
+        Triangle { first: 4, second: 5, third: 6 },
+        Triangle { first: 5, second: 6, third: 7 },
+        Triangle { first: 0, second: 1, third: 4 },
+        Triangle { first: 1, second: 4, third: 5 },
+        Triangle { first: 2, second: 3, third: 6 },
+        Triangle { first: 3, second: 6, third: 7 },
+        Triangle { first: 0, second: 2, third: 4 },
+        Triangle { first: 2, second: 4, third: 6 },
+        Triangle { first: 1, second: 3, third: 5 },
+        Triangle { first: 3, second: 5, third: 7 },
+    ],
+};
+
+struct Cam {
+    x: f16,
+    y: f16,
+    z: f16,
+}
+
+const PLAYER_CAM: &Cam = &Cam {
+    x: 0,
+    y: 0,
+    z: -3,
+};
+
+fn Model::rasterize(model: &Model, cam: &Cam, x_buffer: &f16, y_buffer: &f16, z_buffer: &f16) {
+    let vert = model.verts;
+    let iter = model.vert_count in for iter downto 0 {
+        let z = vert.z - cam.z;
+        ^z_buffer = z;
+        ^x_buffer = (vert.x - cam.x) / z;
+        ^y_buffer = (vert.y - cam.y) / z;
+        vert = vert + 3;
+    }
+}
+
+const VERTEX_X_BUFFER: &f16 = &[0.0; 1024];
+const VERTEX_Y_BUFFER: &f16 = &[0.0; 1024];
+const VERTEX_Z_BUFFER: &f16 = &[0.0; 1024];
+
+fn main() {
+    Model::rasterize(UNIT_CUBE, VERTEX_X_BUFFER, VERTEX_Y_BUFFER, VERTEX_Z_BUFFER);
+}
