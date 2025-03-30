@@ -236,6 +236,19 @@ macro_rules! next_matches {
     };
 }
 
+//todo: find better name
+macro_rules! build_expression {
+    ($expr:ident { $lhs:expr, $rhs:expr }) => {
+        {
+            let lhs = $lhs;
+            let rhs = $rhs;
+            let range = lhs.range.start .. rhs.range.end;
+            let expression = Expression::$expr(Box::new($expr { lhs, rhs }));
+            RangeAnnotation::new(range, expression)
+        }
+    };
+}
+
 //TODO: design macros for repeatedly used logic
 impl Parser<'_> {
     fn parse_expression(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
@@ -255,16 +268,9 @@ impl Parser<'_> {
         let mut lhs = self.parse_compare_operation()?;
         loop {
             if next_matches!(self.lexer, Ok((_, Token::And))) {
-                //TODO: macro that replaces lhs with stuff like below
-                let rhs = self.parse_compare_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::LogicalAnd(Box::new(LogicalAnd { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(LogicalAnd { lhs, self.parse_compare_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::Or))) {
-                let rhs = self.parse_compare_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::LogicalOr(Box::new(LogicalOr { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(LogicalOr { lhs, self.parse_compare_operation()? });
             } else {
                 break Ok(lhs);
             }
@@ -275,35 +281,17 @@ impl Parser<'_> {
         let mut lhs = self.parse_bitwise_operation()?;
         loop {
             if next_matches!(self.lexer, Ok((_, Token::LessThan))) {
-                let rhs = self.parse_bitwise_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::LessThan(Box::new(LessThan { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(LessThan { lhs, self.parse_bitwise_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::LessThanEquals))) {
-                let rhs = self.parse_bitwise_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::LessThanEquals(Box::new(LessThanEquals { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(LessThanEquals { lhs, self.parse_bitwise_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::GreaterThan))) {
-                let rhs = self.parse_bitwise_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::GreaterThan(Box::new(GreaterThan { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(GreaterThan { lhs, self.parse_bitwise_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::GreaterThanEquals))) {
-                let rhs = self.parse_bitwise_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::GreaterThanEquals(Box::new(GreaterThanEquals { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(GreaterThanEquals { lhs, self.parse_bitwise_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::Equals))) {
-                let rhs = self.parse_bitwise_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::Equals(Box::new(Equals { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(Equals { lhs, self.parse_bitwise_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::NotEquals))) {
-                let rhs = self.parse_bitwise_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::NotEquals(Box::new(NotEquals { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(NotEquals { lhs, self.parse_bitwise_operation()? });
             } else {
                 break Ok(lhs);
             }
@@ -314,30 +302,15 @@ impl Parser<'_> {
         let mut lhs = self.parse_dash_operation()?;
         loop {
             if next_matches!(self.lexer, Ok((_, Token::Ampersand))) {
-                let rhs = self.parse_dash_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::BitwiseOr(Box::new(BitwiseOr { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(BitwiseOr { lhs, self.parse_dash_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::Circumflex))) {
-                let rhs = self.parse_dash_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::BitwiseXor(Box::new(BitwiseXor { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(BitwiseXor { lhs, self.parse_dash_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::Pipe))) {
-                let rhs = self.parse_dash_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::BitwiseAnd(Box::new(BitwiseAnd { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(BitwiseAnd { lhs, self.parse_dash_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::LShift))) {
-                let rhs = self.parse_dash_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::LeftShift(Box::new(LeftShift { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(LeftShift { lhs, self.parse_dash_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::RShift))) {
-                let rhs = self.parse_dash_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::RightShift(Box::new(RightShift { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(RightShift { lhs, self.parse_dash_operation()? });
             } else {
                 break Ok(lhs);
             }
@@ -348,15 +321,9 @@ impl Parser<'_> {
         let mut lhs = self.parse_point_operation()?;
         loop {
             if next_matches!(self.lexer, Ok((_, Token::Plus))) {
-                let rhs = self.parse_point_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::Addition(Box::new(Addition { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(Addition { lhs, self.parse_point_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::Minus))) {
-                let rhs = self.parse_point_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::Subtraction(Box::new(Subtraction { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(Subtraction { lhs, self.parse_point_operation()? });
             } else {
                 break Ok(lhs);
             }
@@ -367,15 +334,9 @@ impl Parser<'_> {
         let mut lhs = self.parse_typing_operation()?;
         loop {
             if next_matches!(self.lexer, Ok((_, Token::Asterisk))) {
-                let rhs = self.parse_typing_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::Multiplication(Box::new(Multiplication { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(Multiplication { lhs, self.parse_typing_operation()? });
             } else if next_matches!(self.lexer, Ok((_, Token::Slash))) {
-                let rhs = self.parse_typing_operation()?;
-                let range = lhs.range.start .. rhs.range.end;
-                let expression = Expression::Division(Box::new(Division { lhs, rhs }));
-                lhs = RangeAnnotation::new(range, expression);
+                lhs = build_expression!(Division { lhs, self.parse_typing_operation()? });
             } else {
                 break Ok(lhs);
             }
