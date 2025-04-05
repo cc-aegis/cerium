@@ -85,7 +85,7 @@ impl Parser<'_> {
             (range, Token::F16) => Ok(RangeAnnotation::new(range, CeriumType::F16)),
             (range, Token::Bool) => Ok(RangeAnnotation::new(range, CeriumType::Bool)),
             (range, Token::Any) => Ok(RangeAnnotation::new(range, CeriumType::Any)),
-            (range, Token::Ident(ident)) => Ok(RangeAnnotation::new(range, CeriumType::Struct(ident, Vec::new()))),
+            (range, Token::Ident(ident)) => Ok(RangeAnnotation::new(range, CeriumType::Struct(ident))),
             (Range { start, .. }, Token::Ampersand) => {
                 let RangeAnnotation { range, inner: inner_type } = self.parse_type()?;
                 Ok(RangeAnnotation::new(start .. range.end, CeriumType::Pointer(Box::new(inner_type))))
@@ -406,7 +406,6 @@ impl Parser<'_> {
 
 impl Parser<'_> {
     fn parse_parens(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
-        // TODO: support tuples
         expect_token!(self.lexer, (_, Token::LParen), {});
         let result = self.parse_expression();
         expect_token!(self.lexer, (_, Token::RParen), {});
