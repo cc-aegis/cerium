@@ -7,6 +7,7 @@ pub enum CeriumType {
     F16,
     Any,
     Bool,
+    Tuple(Vec<CeriumType>),
     Struct(String, Vec<CeriumType>), // generics
     Function(Vec<CeriumType>, Option<Box<CeriumType>>), // no interest in working with a unit type
     Pointer(Box<CeriumType>),
@@ -20,6 +21,7 @@ impl Display for CeriumType {
             CeriumType::F16 => write!(f, "f16"),
             CeriumType::Any => write!(f, "any"),
             CeriumType::Bool => write!(f, "bool"),
+            CeriumType::Tuple(types) => write!(f, "({})", join(types, ",")),
             CeriumType::Struct(name, generics) => if generics.is_empty() {
                 write!(f, "{name}")
             } else {
@@ -32,6 +34,22 @@ impl Display for CeriumType {
                 write!(f, "fn({})", join(params, ", "))
             },
             CeriumType::Pointer(ty) => write!(f, "&{ty}"),
+        }
+    }
+}
+
+impl CeriumType {
+    fn len(&self) -> usize {
+        match self {
+            CeriumType::I16 => 1,
+            CeriumType::U16 => 1,
+            CeriumType::F16 => 1,
+            CeriumType::Any => 1,
+            CeriumType::Bool => 1,
+            CeriumType::Tuple(types) => types.iter().map(CeriumType::len).sum(),
+            CeriumType::Struct(_, _) => todo!(),
+            CeriumType::Function(_, _) => todo!(),
+            CeriumType::Pointer(_) => 1,
         }
     }
 }

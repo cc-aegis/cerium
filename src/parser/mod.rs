@@ -236,7 +236,6 @@ macro_rules! next_matches {
     };
 }
 
-//todo: find better name
 macro_rules! build_expression {
     ($expr:ident { $lhs:expr, $rhs:expr }) => {
         {
@@ -249,7 +248,6 @@ macro_rules! build_expression {
     };
 }
 
-//TODO: design macros for repeatedly used logic
 impl Parser<'_> {
     fn parse_expression(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
         // = ||&& <><=>=!=== &|^<<>> +- */ aliasas !&*
@@ -352,7 +350,10 @@ impl Parser<'_> {
                 let expression = Expression::TypeAlias(Box::new(TypeAlias { value, target_type}));
                 value = RangeAnnotation::new(range, expression);
             } else if self.lexer.next_if(|t| matches!(t, Ok((_, Token::As)))).is_some() {
-                todo!()
+                let target_type = self.parse_type()?;
+                let range = value.range.start .. target_type.range.end;
+                let expression = Expression::TypeCast(Box::new(TypeCast { value, target_type}));
+                value = RangeAnnotation::new(range, expression);
             } else {
                 break Ok(value);
             }
@@ -391,6 +392,7 @@ impl Parser<'_> {
             },
             Ok((_, Token::Minus)) => {
                 let range = self.lexer.next().unwrap().unwrap().0;
+                //todo: if next is number -> negative number
                 let inner = self.parse_prefix_operation()?;
                 let range = range.start..inner.range.end;
                 let expression = Expression::Inversion(Box::new(Inversion { inner }));
@@ -404,6 +406,7 @@ impl Parser<'_> {
 
 impl Parser<'_> {
     fn parse_parens(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
+        // TODO: support tuples
         expect_token!(self.lexer, (_, Token::LParen), {});
         let result = self.parse_expression();
         expect_token!(self.lexer, (_, Token::RParen), {});
@@ -559,10 +562,14 @@ impl Parser<'_> {
     }
 
     fn parse_constant(&mut self) -> Result<RangeAnnotation<Expression>, CompilerError> {
-        //TODO: + for signed positive
         match self.lexer.next().ok_or(CompilerError::MissingTokenError)?? {
-            (range, Token::Plus) => todo!(),
-            //TODO: minus?
+            (Range { start, .. }, Token::Plus) => match self.lexer.next().ok_or(CompilerError::MissingTokenError)?? {
+                (Range { end, .. }, Token::Integer(i)) => Ok(RangeAnnotation::new(start .. end, Expression::SignedInteger(i as i16))),
+                (range, token) => Err(CompilerError::UnexpectedTokenError(UnexpectedTokenError {
+                    range,
+                    found: token,
+                }))
+            },
             (range, Token::Integer(i)) => Ok(RangeAnnotation::new(range, Expression::UnsignedInteger(i as u16))),
             (range, Token::Float(f)) => Ok(RangeAnnotation::new(range, Expression::Float(f))),
             (range, Token::True) => Ok(RangeAnnotation::new(range, Expression::Boolean(true))),

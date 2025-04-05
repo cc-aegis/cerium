@@ -1,4 +1,4 @@
-static sqr: &fn(f16)->f16 = &fn(base) {
+const sqr: &fn(f16)->f16 = &fn(base) {
     base * base
 }
 

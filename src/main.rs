@@ -11,7 +11,7 @@ use crate::parser::Parser;
 pub mod lexer;
 pub mod error;
 pub mod parser;
-//mod compiler;
+mod compiler;
 
 fn main() {
     let code = include_str!("../cerium/copy.cer");
