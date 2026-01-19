@@ -1,0 +1,4 @@
+fn mem::alloc(size: u16) -> &any;
+fn mem::free(ptr: &any);
+fn mem::copy(dst: &any, src: &any, size: u16);
+const mem::HEAP: &&any;

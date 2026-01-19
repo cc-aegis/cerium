@@ -1,0 +1,16 @@
+fn mem::alloc(size: u16) -> &any;
+
+
+
+
+struct Pair<First, Second> {
+    first: First,
+    second: Second,
+}
+
+fn Pair::new<First, Second>(first: First, second: Second) -> &Pair<First, Second> {
+    let result = mem::alloc(2) alias &Pair<First, Second>;
+    result.first = first;
+    result.second = second;
+    result
+}

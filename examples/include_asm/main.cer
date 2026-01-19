@@ -1,0 +1,15 @@
+use mem;
+
+const dbg: fn(any) = &[???, 0] alias fn(any);
+
+fn main() {
+    let arr = mem::alloc(10);
+    *arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    let copy = mem::alloc(10);
+    mem::copy(copy, arr, 10);
+    mem::free(arr);
+    let idx = 10 in for idx downto 0 {
+        dbg(arr[idx]);
+    }
+    mem::free(copy);
+}
