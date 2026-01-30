@@ -28,10 +28,9 @@ impl<'a> Lexer<'a> {
 
 
         let mut escaped = false;
-        loop {
-            match self.code.next() {
-                None => return Err(Box::new(UnexpectedEof { expected: Expected::Literal })),
-                Some((_, c)) if escaped => {
+        while let Some((_, next)) = self.code.next_if(|(_, c)| *c != delim || escaped) {
+            match next {
+                c if escaped => {
                     literal.push(match c {
                         '0' => '\0',
                         'n' => '\n',
@@ -41,11 +40,11 @@ impl<'a> Lexer<'a> {
                     });
                     escaped = false;
                 },
-                Some((_, c)) if c == delim => break,
-                Some((_, '\\')) => {
+                c if c == delim => break,
+                '\\' => {
                     escaped = true;
                 },
-                Some((_, c)) => {
+                c => {
                     literal.push(c);
                 },
             };
