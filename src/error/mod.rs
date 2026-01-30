@@ -5,6 +5,7 @@ pub mod unexpected_eof;
 pub mod invalid_character_literal_length;
 pub mod invalid_character;
 
+// TODO: consider turning this into an enum
 pub trait CompilerError: Debug {
     fn format(&self, code: &str) -> String;
 }
