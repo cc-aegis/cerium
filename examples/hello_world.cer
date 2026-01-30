@@ -1,0 +1,16 @@
+const HELLO_WORLD: &char = &"Hello World!\0";
+const TERMINAL_PORT: u16 = 0;
+
+asm fn write_char(port: u16, c: char) {
+    mov rd $port
+    ctx #0 #1
+    ctx #1 $c
+    send
+    ret
+}
+
+fn main() {
+    for character in HELLO_WORLD {
+        write_char(TERMINAL_PORT, character);
+    }
+}
