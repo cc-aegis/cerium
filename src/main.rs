@@ -7,10 +7,7 @@ fn main() {
     let code = "
 fn main() {
     let utof: &fn(u16) -> f16 = &fn(int: u16) -> f16 {
-        let c = '123';
-        int as f16
-    };
-}
+        let c = '123
     ";
     let mut lexer = Lexer::new(code);
     while let Some(token) = lexer.next() {
