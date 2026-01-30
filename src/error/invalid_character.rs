@@ -13,8 +13,8 @@ impl CompilerError for InvalidCharacter {
         let underlined = highlight_lines(&lines);
         format!(
             "{0}{1}\n{underlined}",
-            "Syntax Error".color(Color::Red),
-            format!(": found unexpected character '{}'", self.found).color(Color::BrightWhite),
+            "Invalid Character Error".color(Color::Red),
+            format!(": encountered unexpected character '{}'", self.found).color(Color::BrightWhite),
         )
     }
 }
